@@ -36,11 +36,12 @@ trusted publisher の登録は既存パッケージの設定画面からしか�
 0. 前提: npm org `depatrol` が存在すること (2026-08-01 取得済み)。scoped パッケージの publish には username か既存 org のスコープが必須で、org 名が取れない場合のフォールバックは `@necofuryai` スコープ (ADR 0006 決定 4)。フォールバック時は packaging/npm/ 内の `@depatrol` 参照 3 箇所 (メイン package.json の optionalDependencies、シムの PLATFORMS、prepare.mjs) を改名してから publish する。
 1. npmjs.com で granular token を作成する: Packages and scopes は **Read and write / All packages** (未作成の unscoped `depatrol` は個別指定できない)、**Bypass two-factor authentication を有効化**、有効期限は最短。アカウントの publishing access は既定で「2FA または bypass 付き granular token」を要求するため、bypass 無しの token は publish 時に E403 になる (2026-08-01 実地確認)。`npm login` セッションは publish 時に 2FA の対話を要するため token 方式を推奨。
 2. `node packaging/npm/prepare.mjs 0.0.0-bootstrap --stub`
-3. `node packaging/npm/publish.mjs packaging/npm/dist --tag bootstrap` — `--tag bootstrap` により dist-tag `latest` は汚れない。
-4. npmjs.com で 6 パッケージそれぞれの Settings → Trusted publisher に GitHub Actions (`necofuryai/depatrol` / workflow `release.yml` / environment なし) を登録する。
+3. `node packaging/npm/publish.mjs packaging/npm/dist --tag bootstrap` — 注意: `--tag bootstrap` を付けても、パッケージの初回 publish には npm の仕様で `latest` も同時に付く (2026-08-01 実地確認)。実害はなく、v0.1.0 の publish で `latest` は自動的に移る。
+4. npmjs.com で 6 パッケージそれぞれの Settings → Trusted Publisher に GitHub Actions を登録する: Organization or user `necofuryai` / Repository `depatrol` / Workflow filename `release.yml` (ファイル名のみ) / Environment name 空欄 / **Allowed actions は「Allow npm publish」をチェック** (少なくとも 1 つ必須で、未選択のままでは保存できない — 2026-08-01 実地確認)。保存後、セクションが「Select your publisher」から設定内容の要約表示に変わることを確認する。
 5. granular token を失効させる。以後の長期 credential はゼロ。
 6. v0.1.0 の npm job を (再) 実行する → OIDC + provenance で publish される (公開リポジトリなら provenance は自動付与)。
-7. 任意: `npm deprecate depatrol@0.0.0-bootstrap "bootstrap placeholder; install latest"` (5 platform パッケージも同様)。
+7. publish 確認後、6 パッケージの Publishing access を「Require two-factor authentication and disallow bypass 2fa tokens」に切り替える (trusted publisher の動作には影響しない)。bypass token による direct publishing は npm 側でも 2027-01 に廃止予定。
+8. 任意: `npm deprecate depatrol@0.0.0-bootstrap "bootstrap placeholder; install latest"` (5 platform パッケージも同様)。
 
 ## 最小公開手順 (v0.1.0)
 
@@ -66,9 +67,9 @@ trusted publisher の登録は既存パッケージの設定画面からしか�
 
 ## 検証チェックリスト (第 1 波、v0.1.0)
 
-- [ ] タグ push で Releases に 5 ターゲットのアーカイブ + sha256 checksums + changelog が揃う
-- [ ] `go install github.com/necofuryai/depatrol@v0.1.0` が成功し、`--version` がタグ由来のバージョンを表示する
-- [ ] `npx depatrol --version` / `bunx depatrol --version` / `pnpm dlx depatrol --version` が macOS / Linux / Windows で動く
-- [ ] `npm install --ignore-scripts` でも動作する (lifecycle スクリプト非依存の確認)
-- [ ] npm パッケージに provenance が付与されている (`npm audit signatures` で確認)
-- [ ] publish 部分失敗 → 同一タグでの該当 job 再実行が冪等に修復する (published 済みパッケージをスキップして続行できる)
+- [x] タグ push で Releases に 5 ターゲットのアーカイブ + sha256 checksums + changelog が揃う (2026-08-01 確認)
+- [x] `go install github.com/necofuryai/depatrol@v0.1.0` が成功し、`--version` がタグ由来のバージョンを表示する (2026-08-01 確認)
+- [ ] `npx depatrol --version` / `bunx depatrol --version` / `pnpm dlx depatrol --version` が macOS / Linux / Windows で動く (macOS は 3 ランナーとも 2026-08-01 確認済み。Linux / Windows は未確認)
+- [x] `npm install --ignore-scripts` でも動作する (2026-08-01 実レジストリで確認)
+- [x] npm パッケージに provenance が付与されている (`npm audit signatures` で verified attestations を 2026-08-01 確認)
+- [x] publish 部分失敗 → 同一タグでの該当 job 再実行が冪等に修復する (2026-08-01 実証: ENEEDAUTH 失敗 → bootstrap 後の rerun で publish 成功、さらに全 job 再実行で npm 全 skip + Releases asset 置換を確認)
