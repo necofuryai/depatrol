@@ -16,8 +16,8 @@ import (
 	"github.com/necofuryai/depatrol/internal/domain"
 )
 
-// pageSize caps every list call. M0 reads a single page per source; when a
-// repository exceeds this the report is based on the newest page only.
+// pageSize caps every list call. List endpoints are followed until GitHub
+// reports no next page so a partial page can never look like complete evidence.
 const pageSize = 100
 
 type Scanner struct {
@@ -34,7 +34,6 @@ type observation struct {
 	owner, name    string
 	defaultBranch  string
 	treePaths      []string
-	treeTruncated  bool
 	config         *botConfig // nil when no dependabot.yml exists
 	securityFixes  *github.AutomatedSecurityFixes
 	openAlerts     []*github.DependabotAlert
@@ -74,7 +73,7 @@ func (s *Scanner) ListOrganizationRepositories(ctx context.Context, org string) 
 		if resp.NextPage == 0 {
 			return targets, nil
 		}
-		opts.Page = resp.NextPage
+		opts.ListOptions.Page = resp.NextPage
 	}
 }
 
@@ -144,13 +143,14 @@ func (s *Scanner) observe(ctx context.Context, owner, name string) (*observation
 	if err != nil {
 		return nil, "tree", err
 	}
+	if tree.GetTruncated() {
+		return nil, "tree", errors.New("recursive Git tree response was truncated; manifest coverage cannot be judged safely")
+	}
 	for _, entry := range tree.Entries {
 		if entry.GetType() == "blob" {
 			obs.treePaths = append(obs.treePaths, entry.GetPath())
 		}
 	}
-	obs.treeTruncated = tree.GetTruncated()
-
 	obs.config, err = s.fetchBotConfig(ctx, owner, name, obs.defaultBranch)
 	if err != nil {
 		return nil, "bot_config", err
@@ -204,16 +204,14 @@ func (s *Scanner) observe(ctx context.Context, owner, name string) (*observation
 		if err != nil {
 			return nil, "pull_detail", err
 		}
-		detail.reviews, _, err = s.client.PullRequests.ListReviews(ctx, owner, name, n,
-			&github.ListOptions{PerPage: pageSize})
+		detail.reviews, err = s.fetchPRReviews(ctx, owner, name, n)
 		if err != nil {
 			return nil, "pull_reviews", err
 		}
-		checks, _, err := s.client.Checks.ListCheckRunsForRef(ctx, owner, name, pr.GetHead().GetSHA(), nil)
+		detail.checks, err = s.fetchCheckRuns(ctx, owner, name, pr.GetHead().GetSHA())
 		if err != nil {
 			return nil, "pull_checks", err
 		}
-		detail.checks = checks.CheckRuns
 		obs.prDetails[n] = detail
 	}
 
@@ -226,41 +224,88 @@ func (s *Scanner) observe(ctx context.Context, owner, name string) (*observation
 // or a missing token scope — those are scan errors, or a vulnerable
 // repository would silently read as healthy.
 func (s *Scanner) fetchAlerts(ctx context.Context, owner, name, state string) (alerts []*github.DependabotAlert, disabled bool, err error) {
-	alerts, resp, err := s.client.Dependabot.ListRepoAlerts(ctx, owner, name, &github.ListAlertsOptions{
+	opts := &github.ListAlertsOptions{
 		State:       github.Ptr(state),
 		ListOptions: github.ListOptions{PerPage: pageSize},
-	})
-	if err != nil {
-		var rateErr *github.RateLimitError
-		var abuseErr *github.AbuseRateLimitError
-		if errors.As(err, &rateErr) || errors.As(err, &abuseErr) {
+	}
+	for {
+		page, resp, err := s.client.Dependabot.ListRepoAlerts(ctx, owner, name, opts)
+		if err != nil {
+			var rateErr *github.RateLimitError
+			var abuseErr *github.AbuseRateLimitError
+			if errors.As(err, &rateErr) || errors.As(err, &abuseErr) {
+				return nil, false, err
+			}
+			var ghErr *github.ErrorResponse
+			if resp != nil && resp.StatusCode == 403 && errors.As(err, &ghErr) &&
+				strings.Contains(strings.ToLower(ghErr.Message), "disabled") {
+				return nil, true, nil
+			}
 			return nil, false, err
 		}
-		var ghErr *github.ErrorResponse
-		if resp != nil && resp.StatusCode == 403 && errors.As(err, &ghErr) &&
-			strings.Contains(strings.ToLower(ghErr.Message), "disabled") {
-			return nil, true, nil
+		alerts = append(alerts, page...)
+		if resp == nil || resp.NextPage == 0 {
+			return alerts, false, nil
 		}
-		return nil, false, err
+		opts.ListOptions.Page = resp.NextPage
 	}
-	return alerts, false, nil
 }
 
 func (s *Scanner) fetchBotPRs(ctx context.Context, owner, name, state string) ([]*github.PullRequest, error) {
-	prs, _, err := s.client.PullRequests.List(ctx, owner, name, &github.PullRequestListOptions{
+	opts := &github.PullRequestListOptions{
 		State:       state,
 		ListOptions: github.ListOptions{PerPage: pageSize},
-	})
-	if err != nil {
-		return nil, err
 	}
 	var bot []*github.PullRequest
-	for _, pr := range prs {
-		if pr.GetUser().GetLogin() == dependabotLogin {
-			bot = append(bot, pr)
+	for {
+		prs, resp, err := s.client.PullRequests.List(ctx, owner, name, opts)
+		if err != nil {
+			return nil, err
 		}
+		for _, pr := range prs {
+			if pr.GetUser().GetLogin() == dependabotLogin {
+				bot = append(bot, pr)
+			}
+		}
+		if resp == nil || resp.NextPage == 0 {
+			return bot, nil
+		}
+		opts.Page = resp.NextPage
 	}
-	return bot, nil
+}
+
+func (s *Scanner) fetchPRReviews(ctx context.Context, owner, name string, number int) ([]*github.PullRequestReview, error) {
+	opts := &github.ListOptions{PerPage: pageSize}
+	var reviews []*github.PullRequestReview
+	for {
+		page, resp, err := s.client.PullRequests.ListReviews(ctx, owner, name, number, opts)
+		if err != nil {
+			return nil, err
+		}
+		reviews = append(reviews, page...)
+		if resp == nil || resp.NextPage == 0 {
+			return reviews, nil
+		}
+		opts.Page = resp.NextPage
+	}
+}
+
+func (s *Scanner) fetchCheckRuns(ctx context.Context, owner, name, ref string) ([]*github.CheckRun, error) {
+	// Keep GitHub's default page size on the first request so existing API
+	// recordings remain representative; every advertised next page is read.
+	opts := &github.ListCheckRunsOptions{}
+	var runs []*github.CheckRun
+	for {
+		page, resp, err := s.client.Checks.ListCheckRunsForRef(ctx, owner, name, ref, opts)
+		if err != nil {
+			return nil, err
+		}
+		runs = append(runs, page.CheckRuns...)
+		if resp == nil || resp.NextPage == 0 {
+			return runs, nil
+		}
+		opts.Page = resp.NextPage
+	}
 }
 
 // dependabotLogin is fixed in M0. Configurable bot identity (self-hosted
@@ -392,7 +437,7 @@ func (s *Scanner) judgePausedOrStalled(obs *observation) []domain.Finding {
 		}
 	}
 	var lastActivity *time.Time
-	activityDescription := "no Dependabot pull request or default-branch bot commit is observable (newest 100 open and closed PRs; newest authored commit)"
+	activityDescription := "no Dependabot pull request or default-branch bot commit is observable (all listed open and closed PRs; newest authored commit)"
 	if lastPR != nil {
 		t := lastPR.GetCreatedAt().Time
 		lastActivity = &t

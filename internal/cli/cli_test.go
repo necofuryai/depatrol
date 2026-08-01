@@ -63,6 +63,7 @@ type updateJSON struct {
 	Dependency     string         `json:"dependency"`
 	AdvisoryIDs    []string       `json:"advisory_ids"`
 	State          string         `json:"state"`
+	PRAgeDays      *int           `json:"pr_age_days"`
 	BlockedReasons []string       `json:"blocked_reasons"`
 	Detail         string         `json:"detail"`
 	Confidence     string         `json:"confidence"`
@@ -373,6 +374,9 @@ func TestScanReportsVersionUpdateOpen(t *testing.T) {
 	if u.State != "update_open" {
 		t.Errorf("state = %q, want update_open", u.State)
 	}
+	if u.PRAgeDays == nil || *u.PRAgeDays != 3 {
+		t.Errorf("pr_age_days = %v, want 3", u.PRAgeDays)
+	}
 	if u.Confidence != "confirmed" {
 		t.Errorf("confidence = %q, want confirmed", u.Confidence)
 	}
@@ -514,6 +518,55 @@ func TestScanOrgPaginatesAndSkipsArchivedRepositories(t *testing.T) {
 	}
 }
 
+func TestScanPaginatesEveryJudgmentSource(t *testing.T) {
+	report := scanReport(t, "pagination", "--repo", "acme/paged")
+	repo := singleRepo(t, report)
+
+	// The matching alert and all Dependabot PRs exist only on page 2.
+	// The closed PR for lodash also exists only on page 2.
+	axios := findUpdate(t, repo, "axios")
+	if axios.State != "update_open" {
+		t.Errorf("axios state = %q, want update_open", axios.State)
+	}
+	if axios.PRAgeDays == nil || *axios.PRAgeDays != 3 {
+		t.Errorf("axios pr_age_days = %v, want 3", axios.PRAgeDays)
+	}
+	if len(axios.AdvisoryIDs) != 1 || axios.AdvisoryIDs[0] != "GHSA-page-open-0001" {
+		t.Errorf("axios advisory_ids = %v, want second-page alert", axios.AdvisoryIDs)
+	}
+
+	lodash := findUpdate(t, repo, "lodash")
+	if lodash.State != "merged_not_effective" {
+		t.Errorf("lodash state = %q, want merged_not_effective from second-page closed PR", lodash.State)
+	}
+
+	// The decisive review and failing check run exist only on page 2 of
+	// their respective per-PR endpoints.
+	reviewDep := findUpdate(t, repo, "review-dep")
+	if !hasReason(reviewDep.BlockedReasons, "changes_requested") {
+		t.Errorf("review-dep blocked_reasons = %v, want changes_requested", reviewDep.BlockedReasons)
+	}
+	ciDep := findUpdate(t, repo, "ci-dep")
+	if !hasReason(ciDep.BlockedReasons, "ci_failing") {
+		t.Errorf("ci-dep blocked_reasons = %v, want ci_failing", ciDep.BlockedReasons)
+	}
+}
+
+func TestScanRejectsTruncatedTreeInsteadOfJudgingPartialCoverage(t *testing.T) {
+	report := scanReport(t, "truncated_tree", "--repo", "acme/truncated")
+
+	if len(report.Repositories) != 0 {
+		t.Fatalf("repositories = %+v, want none for incomplete tree evidence", report.Repositories)
+	}
+	if len(report.ScanErrors) != 1 {
+		t.Fatalf("scan_errors = %+v, want one", report.ScanErrors)
+	}
+	err := report.ScanErrors[0]
+	if err.Stage != "tree" || !strings.Contains(strings.ToLower(err.Message), "truncated") {
+		t.Errorf("scan error = %+v, want an explicit tree truncation error", err)
+	}
+}
+
 func TestScanReportsAlertsDisabledAsCoverageGap(t *testing.T) {
 	report := scanReport(t, "alerts_disabled", "--repo", "acme/noalerts")
 	repo := singleRepo(t, report)
@@ -594,6 +647,22 @@ func TestTableOutputProjectsTheReport(t *testing.T) {
 	}
 }
 
+func TestTableOutputIncludesJudgmentsAndEvidence(t *testing.T) {
+	stdout, stderr, code := runScan(t, "update_open", "--repo", "acme/rolling")
+	if code != 0 {
+		t.Fatalf("exit code = %d\nstderr: %s", code, stderr)
+	}
+	for _, want := range []string{
+		"JUDGMENTS", "EVIDENCE", "expected_update", "update_open", "package.json:axios",
+		"confirmed", "3d", "parse", "2026-08-01T12:00:00Z",
+		"GET /repos/acme/rolling/pulls?state=open", "open for 3 days",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("table output missing %q:\n%s", want, stdout)
+		}
+	}
+}
+
 func TestUsageErrorsExitTwo(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "test-token")
 	var out, errOut bytes.Buffer
@@ -603,28 +672,31 @@ func TestUsageErrorsExitTwo(t *testing.T) {
 	}
 }
 
-func TestScanRecordedHealthyRepository(t *testing.T) {
-	// M0 pass criteria 1 and 2 against a cassette recorded from a real
-	// repository (real API shape, credentials scrubbed): no stall false
-	// positive on a known-healthy repository, and every judgment carries
-	// a complete evidence chain. Re-record via TestRecordRealCassette.
-	report := scanReport(t, "recorded_necofuryai_dev", "--repo", "necofuryai/necofuryai.dev")
-
-	if len(report.ScanErrors) != 0 {
-		t.Fatalf("scan errors on the recorded healthy repository: %+v", report.ScanErrors)
+func TestScanKnownHealthyRepositoriesDoNotStall(t *testing.T) {
+	// M0 pass criteria 1 and 2 cover both a cassette recorded from a real
+	// repository (real API shape, credentials scrubbed) and synthetic healthy
+	// boundaries. Re-record the first case via TestRecordRealCassette.
+	cases := []struct {
+		name, cassette, target string
+	}{
+		{"recorded repository", "recorded_necofuryai_dev", "necofuryai/necofuryai.dev"},
+		{"cooldown boundary", "cooldown_healthy", "acme/cooldown"},
+		{"covered manifest", "covered_manifest", "acme/covered"},
 	}
-	if len(report.Repositories) != 1 {
-		t.Fatalf("got %d repositories, want 1", len(report.Repositories))
-	}
-	repo := report.Repositories[0]
-	for _, f := range repo.Findings {
-		if f.Type == "paused_or_stalled" {
-			t.Errorf("false stall on a known-healthy repository (M0 pass criterion 2): %+v", f)
-		}
-		requireAllEvidence(t, f.Evidence, "")
-	}
-	for _, u := range repo.ExpectedUpdates {
-		requireAllEvidence(t, u.Evidence, "")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report := scanReport(t, tc.cassette, "--repo", tc.target)
+			repo := singleRepo(t, report)
+			for _, f := range repo.Findings {
+				if f.Type == "paused_or_stalled" {
+					t.Errorf("false stall on known-healthy %s (M0 pass criterion 2): %+v", tc.target, f)
+				}
+				requireAllEvidence(t, f.Evidence, "")
+			}
+			for _, u := range repo.ExpectedUpdates {
+				requireAllEvidence(t, u.Evidence, "")
+			}
+		})
 	}
 }
 

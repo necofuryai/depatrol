@@ -98,14 +98,17 @@ const (
 // safe/newer version", identified by (repository, manifest, dependency).
 // PRs and alerts are evidence linked to it, not the entity itself.
 type ExpectedUpdate struct {
-	Manifest       string         `json:"manifest"`
-	Dependency     string         `json:"dependency"`
-	AdvisoryIDs    []string       `json:"advisory_ids,omitempty"`
-	State          LifecycleState `json:"state"`
-	BlockedReasons []string       `json:"blocked_reasons,omitempty"`
-	Detail         string         `json:"detail"`
-	Confidence     Confidence     `json:"confidence"`
-	Evidence       []Evidence     `json:"evidence"`
+	Manifest    string         `json:"manifest"`
+	Dependency  string         `json:"dependency"`
+	AdvisoryIDs []string       `json:"advisory_ids,omitempty"`
+	State       LifecycleState `json:"state"`
+	// PRAgeDays is present while an open pull request is the update's
+	// observable work item. A pointer preserves an explicit age of zero.
+	PRAgeDays      *int       `json:"pr_age_days,omitempty"`
+	BlockedReasons []string   `json:"blocked_reasons,omitempty"`
+	Detail         string     `json:"detail"`
+	Confidence     Confidence `json:"confidence"`
+	Evidence       []Evidence `json:"evidence"`
 }
 
 // Rollup labels a repository with its most severe present condition and

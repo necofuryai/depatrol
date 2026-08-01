@@ -38,6 +38,14 @@ type parsedPR struct {
 	directory   string // "/" when the title names no directory
 }
 
+func prAgeDays(now time.Time, pr *github.PullRequest) int {
+	age := int(now.Sub(pr.GetCreatedAt().Time).Hours() / 24)
+	if age < 0 {
+		return 0
+	}
+	return age
+}
+
 func parseBumpTitle(pr *github.PullRequest) (parsedPR, bool) {
 	m := bumpTitle.FindStringSubmatch(pr.GetTitle())
 	if m == nil {
@@ -217,18 +225,18 @@ func (s *Scanner) versionUpdates(obs *observation, used map[int]bool) []domain.E
 		if !ok {
 			continue
 		}
-		ageDays := int(s.now().Sub(pr.GetCreatedAt().Time).Hours() / 24)
+		ageDays := prAgeDays(s.now(), pr)
 		evidence := []domain.Evidence{s.evidence(pullsRoute, domain.MethodParse,
 			fmt.Sprintf("open Dependabot pull request #%d bumps %s from %s to %s, open for %d days",
 				pr.GetNumber(), p.dependency, p.fromVersion, p.toVersion, ageDays),
 			domain.Confirmed)}
 
 		state := domain.UpdateOpen
-		detail := fmt.Sprintf("open Dependabot PR #%d proposes %s -> %s", pr.GetNumber(), p.fromVersion, p.toVersion)
+		detail := fmt.Sprintf("open Dependabot PR #%d proposes %s -> %s (open for %d days)", pr.GetNumber(), p.fromVersion, p.toVersion, ageDays)
 		reasons, reasonEvidence := s.blockedReasons(obs, pr)
 		if len(reasons) > 0 {
 			state = domain.Blocked
-			detail = fmt.Sprintf("Dependabot PR #%d is stopped: %s", pr.GetNumber(), strings.Join(reasons, ", "))
+			detail = fmt.Sprintf("Dependabot PR #%d is stopped after %d days: %s", pr.GetNumber(), ageDays, strings.Join(reasons, ", "))
 			evidence = append(evidence, reasonEvidence...)
 		}
 
@@ -236,6 +244,7 @@ func (s *Scanner) versionUpdates(obs *observation, used map[int]bool) []domain.E
 			Manifest:       manifestForVersionUpdate(obs, p),
 			Dependency:     p.dependency,
 			State:          state,
+			PRAgeDays:      &ageDays,
 			BlockedReasons: reasons,
 			Detail:         detail,
 			Confidence:     domain.WeakestLink(evidence),
@@ -289,6 +298,7 @@ func (s *Scanner) advisoryUpdates(obs *observation) ([]domain.ExpectedUpdate, ma
 		var state domain.LifecycleState
 		var detail string
 		var blocked []string
+		var ageDays *int
 		switch {
 		case !hasFix:
 			state = domain.FixUnavailable
@@ -327,20 +337,22 @@ func (s *Scanner) advisoryUpdates(obs *observation) ([]domain.ExpectedUpdate, ma
 				domain.Confirmed))
 		default:
 			used[matched.pr.GetNumber()] = true
+			age := prAgeDays(s.now(), matched.pr)
+			ageDays = &age
 			evidence = append(evidence, s.evidence(pullsRoute, domain.MethodParse,
-				fmt.Sprintf("open Dependabot pull request #%d bumps %s to %s", matched.pr.GetNumber(), id.dependency, matched.toVersion),
+				fmt.Sprintf("open Dependabot pull request #%d bumps %s to %s, open for %d days", matched.pr.GetNumber(), id.dependency, matched.toVersion, age),
 				domain.Confirmed))
 			var reasonEvidence []domain.Evidence
 			blocked, reasonEvidence = s.blockedReasons(obs, matched.pr)
 			if len(blocked) > 0 {
 				state = domain.Blocked
-				detail = fmt.Sprintf("Dependabot PR #%d for the security update is stopped: %s",
-					matched.pr.GetNumber(), strings.Join(blocked, ", "))
+				detail = fmt.Sprintf("Dependabot PR #%d for the security update is stopped after %d days: %s",
+					matched.pr.GetNumber(), age, strings.Join(blocked, ", "))
 				evidence = append(evidence, reasonEvidence...)
 			} else {
 				state = domain.UpdateOpen
-				detail = fmt.Sprintf("open Dependabot PR #%d proposes %s -> %s",
-					matched.pr.GetNumber(), matched.fromVersion, matched.toVersion)
+				detail = fmt.Sprintf("open Dependabot PR #%d proposes %s -> %s (open for %d days)",
+					matched.pr.GetNumber(), matched.fromVersion, matched.toVersion, age)
 			}
 		}
 
@@ -349,6 +361,7 @@ func (s *Scanner) advisoryUpdates(obs *observation) ([]domain.ExpectedUpdate, ma
 			Dependency:     id.dependency,
 			AdvisoryIDs:    advisoryIDs,
 			State:          state,
+			PRAgeDays:      ageDays,
 			BlockedReasons: blocked,
 			Detail:         detail,
 			Confidence:     domain.WeakestLink(evidence),

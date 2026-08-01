@@ -37,3 +37,16 @@ Go を採択する。
 - 本 ADR の評価基準にあった「PR timeline の一括取得は GraphQL が効率的」は、M0 の規模 (リポジトリ逐次走査 + open PR ごとに 3 呼び出し) では REST のみで足りた。organization 規模が大きくなる M1 以降で再評価する。
 - 単一バイナリ配布と goroutine 並行走査は M0 では未活用 (逐次 + rate 制限で十分)。配布の軽さは dogfooding 開始時に効く見込み。
 - 再考ゲート (M1 着手前) の判断材料として: Go を覆す理由は現時点で観測されていない。
+
+## M0 技術関門の判定 (2026-08-02)
+
+M0 の技術的 No-go 条件は発火せず、M1 へ継続可能と判定した。
+実装言語は M1 でも Go を継続する。
+
+作者の公開リポジトリ4件に対する dogfooding は scan error 0件で完了した。
+schedule を持つ実リポジトリ1件で stalled の誤検出はなく、病理系と cooldown 境界は合成 cassette で再現できた。
+詳細は [M0 dogfooding 結果](../validation/2026-08-02-m0-dogfooding.md) に記録した。
+
+この判定は「Dependabot の run 成功を直接観測できる」ことを意味しない。
+GitHub API は最終成功 run を直接返さないため、stalled は schedule、cooldown、bot activity から導く `inferred` の判定として維持する。
+この Evidence 連鎖を人間が監査できる範囲では技術的 No-go 条件に該当しないが、policy gate や自動修正の確定根拠には使わない。
