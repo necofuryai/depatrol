@@ -1,28 +1,32 @@
-# 0002. 実装言語とアーキテクチャ
+# 0002. 実装言語は Go
 
-- ステータス: 検討中 (未決)
-- 日付: 2026-08-01
+- ステータス: 採択
+- 日付: 2026-08-01 (grilling を経て同日採択)
 
 ## 背景
 
-feasibility spike CLI から始め、将来は read-only GitHub App と最小 Web UI まで育てる。
+feasibility spike CLI から始め、将来は read-only GitHub App と最小 Web UI まで育てる。候補は TypeScript (Node 22)、Go、Rust。
 
-候補は TypeScript (Node 22)、Go、Rust。
+当初の決定プロセスは「1. grilling で要件と制約を出し切る → 2. 必要なら三候補で最小実装比較 → 3. 採択」だった。2026-08-01 の grilling (ステップ 1) で要件が確定し、その過程の二つの決定が選定の力学を変えた。
 
-決定は急がず、評価プロセスを経てから ADR として採択する。
+1. **ADR 0003 (version 解決を自前で行わない)** により、Renovate (TS 製) のエコシステム実装を再利用するという TS の最大の誘因が消滅した。
+2. **ADR 0004 (governance-as-code)** により M4 の Web UI は閲覧専用となり、「フルスタック TS で管理画面まで」という第二の誘因も弱まった。
 
-## 評価基準 (ドラフト)
+## 決定
 
-- GitHub API クライアントの成熟度: octokit (TS)、go-github + githubv4 (Go)、octocrab (Rust)。alert 系は REST、PR timeline の一括取得は GraphQL が効率的なため、両対応が必要。
-- 配布形態: CLI は単一バイナリ配布が望ましい (Go / Rust 有利)。GitHub App / 常駐サービスへの発展 (TS / Go 有利)。
-- organization 横断走査の並行処理と rate limit 制御の書きやすさ。
-- dependency-management-data (Go 製) との連携形態: ライブラリ連携なら Go、プロセス / データ連携なら言語を問わない。
-- コントリビューター獲得: この分野の隣接 OSS は Go が多い。
-- 作者の習熟度と開発速度: TS が最速、Rust は学習コスト込み。
-- 型安全性と長期保守性。
+Go を採択する。
 
-## 決定プロセス
+ステップ 2 (三言語での最小実装比較) は省略する。代わりに M0 自体を実地検証とし、M0 完了時に「Go で苦痛だった点」を本 ADR に追記して、M1 着手前を再考ゲートとする。
 
-1. grilling で要件と制約を出し切る。
-2. 必要なら同一の API 呼び出しセット (alert 取得、PR 列挙、merge 祖先判定) を各候補で最小実装して比較する。
-3. 結果を本 ADR に追記し、ステータスを「採択」に変える。
+## 理由
+
+1. 単一バイナリ配布が M0 CLI の「試しやすさ」に直結する。dogfooding と公開シグナル観測を検証の中心に据えた (ROADMAP 並走レーン) 以上、配布の軽さは検証計画の一部である。
+2. M2 で連携する dependency-management-data と OSV-Scanner はともに Go 製で、ライブラリレベルの連携が開ける。
+3. go-github + githubv4 で REST と GraphQL の両対応が成熟している。organization 横断走査の並行処理と rate limit 制御も goroutine + 既存 rate limiter で書きやすい。
+4. この分野の隣接 OSS は Go が実勢であり、コントリビューター獲得に有利。
+5. 比較実装は三通りの GitHub API クライアント習作に個人開発の最稀少資源 (時間) を払う行為で、要件確定後の期待情報価値に見合わない。TS の固有利点は上記のとおり消滅し、Rust には学習コストに見合う固有利点がない。
+
+## 帰結
+
+- 作者の開発速度は TS が最速だったため、その優位は失う。受け入れる。
+- M0 完了時に実装上の苦痛点を本 ADR に追記し、M1 着手前に一度だけ再考する。覆すコストが最小のうちに見直すためのゲートであり、以降は再考しない。
