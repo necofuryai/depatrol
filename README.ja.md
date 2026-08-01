@@ -1,0 +1,66 @@
+# depatrol
+
+[English](README.md) | **日本語**
+
+依存関係更新 bot のための read-only control plane。
+
+depatrol は Dependabot と Renovate をリポジトリ横断で監視し、一つの問いに証跡付きで答える: **すべてのリポジトリは、依存関係の更新を実際に受け取り、取り込めているか?**
+
+既存のツールは、bot が「設定されている」ことを確認する (OpenSSF Scorecard、Evergreen) か、open な alert を集計する (GitHub Security Overview、Dependency-Track)。しかし、次の点を bot 中立かつ継続的に検証するものはない:
+
+1. すべてのリポジトリとすべての manifest が更新 bot にカバーされている
+2. bot が組織の policy どおりに設定されている
+3. スケジュールされた run が実際に実行されている (Dependabot は、PR が 90 日間触れられない、または run が 15 回失敗すると、静かに一時停止する)
+4. 利用可能な修正のそれぞれに更新 PR が存在する、または作成できない理由が判明している
+5. 停滞している PR の理由が説明されている (CI、merge conflict、review、rate limit、version constraint)
+6. merge された修正が「現在の default branch 上で有効」である (revert されておらず、脆弱な version へ再解決されてもいない)
+7. policy の SLA を超過した未修正の脆弱性が、判明している owner にエスカレーションされる
+
+「設定ファイルが存在する」ことと「更新の仕組みが健全である」ことは同じではない。depatrol は、この二つの間にある隙間そのものを製品として扱う。
+
+## ステータス
+
+pre-alpha の設計フェーズ。domain model は確定している ([CONTEXT.md](CONTEXT.md) と [docs/decisions/](docs/decisions/) を参照)。実装言語は Go である (ADR 0002)。
+
+最初のマイルストーンは、read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する feasibility spike CLI。すべての判定には、`confirmed` または `inferred` の印が付いた証跡の連鎖が伴う。
+
+## ドメインモデル
+
+depatrol は二層のモデルを使う:
+
+- **Finding (所見)**: 対象 (manifest、bot 設定、例外レコード) に付く、検証された観測。一つのリポジトリに複数の Finding が共存し、排他的な状態ではない。
+- **ExpectedUpdate (期待更新) のライフサイクル**: 起きるべき更新の一つひとつを *ExpectedUpdate* (同一性は repository × manifest × dependency の組) として追跡し、PR がまだ存在するかどうかに関係なく、`pending → update_open → blocked ⇄ …` を経て `effective` または `merged_not_effective` に至るまで追う。PR や alert はこの entity に紐づく証跡であって entity 本体ではないため、PR の作り直しや grouped PR があっても追跡は途切れない。
+- **Evidence (証跡)**: すべての判定は、根拠となった観測を引用する。各観測は `confirmed` (直接観測) か `inferred` (推定) のいずれかで、判定が `confirmed` になるのは、判定を支える観測のすべてが `confirmed` であるときに限る (最弱リンク則)。
+
+製品の輪郭は、次の二つの線引きが定める:
+
+- **depatrol は version 解決を自分では行わない** (ADR 0003)。検証するのは、bot が約束したことを実行しているかであって、可能なことをすべて約束したかではない。
+- **depatrol はどこにも書き込まない** (ADR 0004)。policy、owner マッピング、例外は、組織自身の統治リポジトリに置く宣言的 YAML である。例外の承認は pull request の review であり、監査証跡は git の履歴である。
+
+## リポジトリ rollup の語彙
+
+リポジトリ横断のビューでは、各リポジトリに、現存する条件のうち最も深刻なもののラベルを付ける (条件ごとの件数を併記する)。深刻度の高い順に:
+
+| ラベル | 意味 |
+|---|---|
+| `sla_breached` | policy が定める対応期限を超過している (導出値) |
+| `vulnerable_unpatched` | 未修正の脆弱性が現在の default branch に残っている (導出値) |
+| `merged_not_effective` | merge 済みだが、現在の default branch の再評価では修正が有効になっていない |
+| `fix_unavailable` | alert は存在するが、互換性のある修正版を作れない |
+| `blocked` | 更新 PR が説明可能な理由 (CI、conflict、review、constraint) で停止している |
+| `paused_or_stalled` | bot が一時停止しているか、期待した run が観測できない |
+| `coverage_gap` | bot 設定も security feature も無い manifest がある |
+| `policy_drift` | schedule、group、target branch が組織 policy から逸脱している |
+| `update_open` | 更新 PR が処理待ち |
+| `pending` | 更新が利用可能と判明しているが、bot がまだ PR を作っていない (schedule / cooldown の範囲内なら正常) |
+| `healthy` | Finding も未解決の ExpectedUpdate も無い (導出値) |
+
+承認済みの例外が付いた条件は rollup から抑止される (記録には残る)。すべての条件が抑止されたリポジトリには `exception_active` が表示される。
+
+## 背景
+
+このプロジェクトは、市場と競合の調査 (2026-08) を出発点とする。全文は [docs/research/2026-08-01-market-research.md](docs/research/2026-08-01-market-research.md) にある。
+
+## ライセンス
+
+Apache-2.0。コントリビューションには DCO の sign-off (`git commit -s`) が必要である。

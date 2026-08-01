@@ -1,5 +1,7 @@
 # depatrol
 
+**English** | [日本語](README.ja.md)
+
 Read-only control plane for dependency update bots.
 
 depatrol watches Dependabot and Renovate across all your repositories and answers one question with evidence: **is every repository actually receiving and absorbing dependency updates?**
