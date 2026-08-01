@@ -51,7 +51,7 @@ trusted publisher の登録は既存パッケージの設定画面からしか�
 4. `git tag v0.1.0 && git push origin v0.1.0`
 5. github-release job の成果物 (5 アーカイブ + checksums + changelog) を確認する。
 6. npm bootstrap (上記) → 同一タグで npm job を再実行する。
-7. branch protection を設定する (required check = ci / test、PR 必須)。以後 main への直接 commit をやめ、短命ブランチ + PR に統一する (CLAUDE.md のブランチ戦略)。
+7. branch protection を設定する (required check = ci / test、PR 必須)。以後 main への直接 commit をやめ、短命ブランチ + PR に統一する ([CONTRIBUTING.md](../../CONTRIBUTING.md) のブランチ戦略)。
 8. 検証チェックリストを消化する。
 
 チャネル公開は非原子的である (ADR 0006 決定 3)。タグ push 時点で bootstrap 未了なら npm job は失敗するが、これは想定内で、bootstrap + trusted publisher 登録後に同一タグで npm job を rerun して修復する — この rerun がチェックリスト最終項目 (冪等修復) の実地検証を兼ねる。
