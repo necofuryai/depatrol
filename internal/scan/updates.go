@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -17,6 +16,12 @@ import (
 // before an unresolved alert counts as merged_not_effective. Without this
 // grace a scan seconds after a merge would produce a false positive.
 const mergeReevaluationGrace = 24 * time.Hour
+
+// reviewWaitGraceDays is how long requested reviewers may sit silent
+// before that silence counts as a review-wait blocked reason. Fresh PRs
+// under branch protection get reviewers requested instantly; flagging
+// them immediately would be a false positive.
+const reviewWaitGraceDays = 7
 
 // bumpTitle parses Dependabot's single-dependency PR titles, e.g.
 // "Bump lodash from 4.17.20 to 4.17.21 in /app", optionally prefixed by a
@@ -45,14 +50,13 @@ func parseBumpTitle(pr *github.PullRequest) (parsedPR, bool) {
 	return parsedPR{pr: pr, dependency: m[1], fromVersion: m[2], toVersion: m[3], directory: dir}, true
 }
 
-// manifestDirOf maps an alert's manifest_path to the directory vocabulary
-// used by PR titles: "/" for root, "/sub/dir" otherwise.
-func manifestDirOf(manifestPath string) string {
-	dir := path.Dir(manifestPath)
-	if dir == "." {
-		return "/"
-	}
-	return "/" + dir
+// updateIdentity is the within-repository part of an ExpectedUpdate's
+// identity (CONTEXT.md: repository × manifest × dependency — the
+// repository component is implicit in a per-repository scan).
+type updateIdentity struct{ manifest, dependency string }
+
+func alertIdentity(a *github.DependabotAlert) updateIdentity {
+	return updateIdentity{a.GetDependency().GetManifestPath(), a.GetDependency().GetPackage().GetName()}
 }
 
 func findOpenBotPR(open []*github.PullRequest, dependency, directory string) *parsedPR {
@@ -84,6 +88,19 @@ func findMergedBotPR(closed []*github.PullRequest, dependency, directory string)
 	return nil
 }
 
+// mergedPREvidence records the observation of a merged Dependabot PR for
+// a dependency. Both consumers (merged_not_effective and effective) must
+// describe the same observation with the same words.
+func (s *Scanner) mergedPREvidence(obs *observation, merged *parsedPR, dependency string) domain.Evidence {
+	return s.evidence(
+		apiRoute("GET /repos/%s/%s/pulls?state=closed", obs.owner, obs.name),
+		domain.MethodParse,
+		fmt.Sprintf("Dependabot pull request #%d bumping %s to %s was merged at %s",
+			merged.pr.GetNumber(), dependency, merged.toVersion, merged.pr.GetMergedAt().Format(time.RFC3339)),
+		domain.Confirmed,
+	)
+}
+
 // blockedReasons inspects one open PR's detail observations for the three
 // blocked reasons M0 can observe directly: failing checks, a merge
 // conflict, and a review requesting changes.
@@ -97,7 +114,7 @@ func (s *Scanner) blockedReasons(obs *observation, pr *github.PullRequest) (reas
 			reasons = append(reasons, "ci_failing")
 			evidence = append(evidence, s.evidence(
 				apiRoute("GET /repos/%s/%s/commits/%s/check-runs", obs.owner, obs.name, pr.GetHead().GetSHA()),
-				"api_read",
+				domain.MethodAPIRead,
 				fmt.Sprintf("check run %q concluded %s on the head commit of PR #%d", c.GetName(), c.GetConclusion(), pr.GetNumber()),
 				domain.Confirmed))
 			break
@@ -107,7 +124,7 @@ func (s *Scanner) blockedReasons(obs *observation, pr *github.PullRequest) (reas
 		reasons = append(reasons, "merge_conflict")
 		evidence = append(evidence, s.evidence(
 			apiRoute("GET /repos/%s/%s/pulls/%d", obs.owner, obs.name, pr.GetNumber()),
-			"api_read",
+			domain.MethodAPIRead,
 			fmt.Sprintf("GitHub reports PR #%d as not mergeable (state %q)", pr.GetNumber(), d.full.GetMergeableState()),
 			domain.Confirmed))
 	}
@@ -123,10 +140,30 @@ func (s *Scanner) blockedReasons(obs *observation, pr *github.PullRequest) (reas
 			reasons = append(reasons, "changes_requested")
 			evidence = append(evidence, s.evidence(
 				apiRoute("GET /repos/%s/%s/pulls/%d/reviews", obs.owner, obs.name, pr.GetNumber()),
-				"api_read",
+				domain.MethodAPIRead,
 				fmt.Sprintf("latest review by %s on PR #%d requests changes", user, pr.GetNumber()),
 				domain.Confirmed))
 			break
+		}
+	}
+	// review-wait: reviewers were requested long ago and nobody has
+	// reviewed at all. Whether the review is *required* cannot be
+	// observed with read-only credentials, so the reason is an inference
+	// — and it only applies when nothing else explains the stop.
+	if len(reasons) == 0 && d.full != nil && len(d.full.RequestedReviewers) > 0 && len(d.reviews) == 0 {
+		if ageDays := int(s.now().Sub(pr.GetCreatedAt().Time).Hours() / 24); ageDays > reviewWaitGraceDays {
+			reasons = append(reasons, "review_pending")
+			evidence = append(evidence,
+				s.evidence(
+					apiRoute("GET /repos/%s/%s/pulls/%d", obs.owner, obs.name, pr.GetNumber()),
+					domain.MethodAPIRead,
+					fmt.Sprintf("PR #%d has %d requested reviewer(s), no submitted review, and has been open for %d days", pr.GetNumber(), len(d.full.RequestedReviewers), ageDays),
+					domain.Confirmed),
+				s.evidence(
+					"rule:review_wait_inference",
+					domain.MethodInference,
+					"prolonged reviewer-requested silence suggests the PR is waiting on review; whether that review is required cannot be observed with read-only credentials",
+					domain.Inferred))
 		}
 	}
 	return reasons, evidence
@@ -181,7 +218,7 @@ func (s *Scanner) versionUpdates(obs *observation, used map[int]bool) []domain.E
 			continue
 		}
 		ageDays := int(s.now().Sub(pr.GetCreatedAt().Time).Hours() / 24)
-		evidence := []domain.Evidence{s.evidence(pullsRoute, "api_read",
+		evidence := []domain.Evidence{s.evidence(pullsRoute, domain.MethodParse,
 			fmt.Sprintf("open Dependabot pull request #%d bumps %s from %s to %s, open for %d days",
 				pr.GetNumber(), p.dependency, p.fromVersion, p.toVersion, ageDays),
 			domain.Confirmed)}
@@ -214,11 +251,10 @@ func (s *Scanner) versionUpdates(obs *observation, used map[int]bool) []domain.E
 // every advisory ID. The returned set names the open PRs it consumed so
 // version-update materialization does not double-count them.
 func (s *Scanner) advisoryUpdates(obs *observation) ([]domain.ExpectedUpdate, map[int]bool) {
-	type identity struct{ manifest, dependency string }
-	grouped := map[identity][]*github.DependabotAlert{}
-	var order []identity
+	grouped := map[updateIdentity][]*github.DependabotAlert{}
+	var order []updateIdentity
 	for _, a := range obs.openAlerts {
-		id := identity{a.GetDependency().GetManifestPath(), a.GetDependency().GetPackage().GetName()}
+		id := alertIdentity(a)
 		if _, ok := grouped[id]; !ok {
 			order = append(order, id)
 		}
@@ -245,10 +281,10 @@ func (s *Scanner) advisoryUpdates(obs *observation) ([]domain.ExpectedUpdate, ma
 			} else {
 				desc += ", no patched version released"
 			}
-			evidence = append(evidence, s.evidence(alertsRoute, "api_read", desc, domain.Confirmed))
+			evidence = append(evidence, s.evidence(alertsRoute, domain.MethodAPIRead, desc, domain.Confirmed))
 		}
 
-		matched := findOpenBotPR(obs.openPRs, id.dependency, manifestDirOf(id.manifest))
+		matched := findOpenBotPR(obs.openPRs, id.dependency, directoryOf(id.manifest))
 
 		var state domain.LifecycleState
 		var detail string
@@ -258,32 +294,40 @@ func (s *Scanner) advisoryUpdates(obs *observation) ([]domain.ExpectedUpdate, ma
 			state = domain.FixUnavailable
 			detail = "an advisory is open but no compatible fixed version has been released"
 		case matched == nil:
-			// No open PR. A sufficiently old merged PR whose alert GitHub
-			// has still not resolved means the merge did not take effect
-			// on the current default branch (the product's core check).
-			if merged := findMergedBotPR(obs.closedPRs, id.dependency, manifestDirOf(id.manifest)); merged != nil &&
-				s.now().Sub(merged.pr.GetMergedAt().Time) > mergeReevaluationGrace {
-				state = domain.MergedNotEffective
-				detail = fmt.Sprintf("Dependabot PR #%d was merged but the advisory is still open on the current default branch (reverted, or the resolution regressed)", merged.pr.GetNumber())
-				evidence = append(evidence,
-					s.evidence(apiRoute("GET /repos/%s/%s/pulls?state=closed", obs.owner, obs.name), "api_read",
-						fmt.Sprintf("Dependabot pull request #%d bumping %s to %s was merged at %s",
-							merged.pr.GetNumber(), id.dependency, merged.toVersion,
-							merged.pr.GetMergedAt().Format(time.RFC3339)),
-						domain.Confirmed),
-					s.evidence(alertsRoute, "api_read",
+			// No open PR. A merged PR whose alert GitHub has still not
+			// resolved means — once the re-evaluation grace has passed —
+			// that the merge did not take effect on the current default
+			// branch (the product's core check).
+			if merged := findMergedBotPR(obs.closedPRs, id.dependency, directoryOf(id.manifest)); merged != nil {
+				evidence = append(evidence, s.mergedPREvidence(obs, merged, id.dependency))
+				if s.now().Sub(merged.pr.GetMergedAt().Time) > mergeReevaluationGrace {
+					state = domain.MergedNotEffective
+					detail = fmt.Sprintf("Dependabot PR #%d was merged but the advisory is still open on the current default branch (reverted, or the resolution regressed)", merged.pr.GetNumber())
+					evidence = append(evidence, s.evidence(alertsRoute, domain.MethodAPIRead,
 						"the alert remains open although GitHub re-evaluates default-branch manifests on push; the fix is not effective",
 						domain.Confirmed))
+				} else {
+					// Inside the grace window the observed merge is
+					// acknowledged, never denied: the update sits between
+					// merge and GitHub's re-evaluation, which the
+					// published vocabulary expresses as pending.
+					state = domain.Pending
+					detail = fmt.Sprintf("Dependabot PR #%d was merged %dh ago; awaiting GitHub's re-evaluation of the default branch before judging effectiveness",
+						merged.pr.GetNumber(), int(s.now().Sub(merged.pr.GetMergedAt().Time).Hours()))
+					evidence = append(evidence, s.evidence(alertsRoute, domain.MethodAPIRead,
+						"the alert is still open; GitHub's post-merge re-evaluation is given a grace period before judging merged_not_effective",
+						domain.Confirmed))
+				}
 				break
 			}
 			state = domain.Pending
 			detail = "a security fix is available but no Dependabot PR exists yet"
-			evidence = append(evidence, s.evidence(pullsRoute, "api_read",
+			evidence = append(evidence, s.evidence(pullsRoute, domain.MethodAPIRead,
 				fmt.Sprintf("no open Dependabot pull request proposes an update for %s in %s", id.dependency, id.manifest),
 				domain.Confirmed))
 		default:
 			used[matched.pr.GetNumber()] = true
-			evidence = append(evidence, s.evidence(pullsRoute, "api_read",
+			evidence = append(evidence, s.evidence(pullsRoute, domain.MethodParse,
 				fmt.Sprintf("open Dependabot pull request #%d bumps %s to %s", matched.pr.GetNumber(), id.dependency, matched.toVersion),
 				domain.Confirmed))
 			var reasonEvidence []domain.Evidence
@@ -320,35 +364,30 @@ func (s *Scanner) advisoryUpdates(obs *observation) ([]domain.ExpectedUpdate, ma
 // is confirmed without any re-scan of depatrol's own (healthy
 // repositories get the same evidence treatment as unhealthy ones).
 func (s *Scanner) effectiveUpdates(obs *observation) []domain.ExpectedUpdate {
-	type identity struct{ manifest, dependency string }
-	stillOpen := map[identity]bool{}
+	stillOpen := map[updateIdentity]bool{}
 	for _, a := range obs.openAlerts {
-		stillOpen[identity{a.GetDependency().GetManifestPath(), a.GetDependency().GetPackage().GetName()}] = true
+		stillOpen[alertIdentity(a)] = true
 	}
 	alertsRoute := apiRoute("GET /repos/%s/%s/dependabot/alerts?state=fixed", obs.owner, obs.name)
-	seen := map[identity]bool{}
+	seen := map[updateIdentity]bool{}
 	var updates []domain.ExpectedUpdate
 	for _, a := range obs.fixedAlerts {
-		id := identity{a.GetDependency().GetManifestPath(), a.GetDependency().GetPackage().GetName()}
+		id := alertIdentity(a)
 		// An identity with another advisory still open is not a success
 		// story; the open-alert ExpectedUpdate owns it.
 		if seen[id] || stillOpen[id] {
 			continue
 		}
 		seen[id] = true
-		merged := findMergedBotPR(obs.closedPRs, id.dependency, manifestDirOf(id.manifest))
+		merged := findMergedBotPR(obs.closedPRs, id.dependency, directoryOf(id.manifest))
 		if merged == nil {
 			// Resolved without observable bot work (e.g. a manual bump):
 			// there is no bot lifecycle for M0 to report.
 			continue
 		}
 		evidence := []domain.Evidence{
-			s.evidence(apiRoute("GET /repos/%s/%s/pulls?state=closed", obs.owner, obs.name), "api_read",
-				fmt.Sprintf("Dependabot pull request #%d bumping %s to %s was merged at %s",
-					merged.pr.GetNumber(), id.dependency, merged.toVersion,
-					merged.pr.GetMergedAt().Format(time.RFC3339)),
-				domain.Confirmed),
-			s.evidence(alertsRoute, "api_read",
+			s.mergedPREvidence(obs, merged, id.dependency),
+			s.evidence(alertsRoute, domain.MethodAPIRead,
 				fmt.Sprintf("alert #%d (%s) was resolved by GitHub's default-branch re-evaluation at %s",
 					a.GetNumber(), a.GetSecurityAdvisory().GetGHSAID(), a.GetFixedAt().Format(time.RFC3339)),
 				domain.Confirmed),
@@ -379,7 +418,7 @@ func (s *Scanner) deriveVulnerable(updates []domain.ExpectedUpdate) []domain.Fin
 		advisories := strings.Join(u.AdvisoryIDs, ", ")
 		evidence := []domain.Evidence{{
 			Source: "rule:vulnerable_unpatched",
-			Method: "derivation",
+			Method: domain.MethodDerivation,
 			Description: fmt.Sprintf(
 				"advisory-linked expected update for %s in %s is in state %s, not effective, so the default branch still carries %s",
 				u.Dependency, u.Manifest, u.State, advisories),
@@ -388,7 +427,7 @@ func (s *Scanner) deriveVulnerable(updates []domain.ExpectedUpdate) []domain.Fin
 		}}
 		findings = append(findings, domain.Finding{
 			Type:       domain.VulnerableUnpatched,
-			Subject:    domain.Subject{Kind: "expected_update", ID: u.Manifest + ":" + u.Dependency},
+			Subject:    domain.Subject{Kind: domain.SubjectExpectedUpdate, ID: u.Manifest + ":" + u.Dependency},
 			Derived:    true,
 			Confidence: u.Confidence,
 			Detail:     "unfixed vulnerability remains on the default branch: " + advisories,

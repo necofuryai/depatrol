@@ -6,6 +6,7 @@ package scan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -30,17 +31,19 @@ func New(client *github.Client, now func() time.Time) *Scanner {
 
 // observation is everything M0 reads about one repository before judging.
 type observation struct {
-	owner, name   string
-	defaultBranch string
-	treePaths     []string
-	treeTruncated bool
-	config        *botConfig // nil when no dependabot.yml exists
-	securityFixes *github.AutomatedSecurityFixes
-	openAlerts    []*github.DependabotAlert
-	fixedAlerts   []*github.DependabotAlert
-	openPRs       []*github.PullRequest // Dependabot-authored only
-	closedPRs     []*github.PullRequest // Dependabot-authored only
-	prDetails     map[int]*prDetail     // keyed by open PR number
+	owner, name    string
+	defaultBranch  string
+	treePaths      []string
+	treeTruncated  bool
+	config         *botConfig // nil when no dependabot.yml exists
+	securityFixes  *github.AutomatedSecurityFixes
+	openAlerts     []*github.DependabotAlert
+	fixedAlerts    []*github.DependabotAlert
+	openPRs        []*github.PullRequest // Dependabot-authored only
+	closedPRs      []*github.PullRequest // Dependabot-authored only
+	prDetails      map[int]*prDetail     // keyed by open PR number
+	lastBotCommit  *time.Time            // newest default-branch commit authored by the bot
+	alertsDisabled bool                  // Dependabot alerts are disabled for the repository
 }
 
 // prDetail is the per-PR observation set needed to explain why an open
@@ -55,20 +58,24 @@ type prDetail struct {
 // Archived repositories are skipped: update bots do not run on them, so
 // scanning them could only produce false stall findings.
 func (s *Scanner) ListOrganizationRepositories(ctx context.Context, org string) ([]string, error) {
-	repos, _, err := s.client.Repositories.ListByOrg(ctx, org, &github.RepositoryListByOrgOptions{
-		ListOptions: github.ListOptions{PerPage: pageSize},
-	})
-	if err != nil {
-		return nil, err
-	}
+	opts := &github.RepositoryListByOrgOptions{ListOptions: github.ListOptions{PerPage: pageSize}}
 	var targets []string
-	for _, r := range repos {
-		if r.GetArchived() {
-			continue
+	for {
+		repos, resp, err := s.client.Repositories.ListByOrg(ctx, org, opts)
+		if err != nil {
+			return nil, err
 		}
-		targets = append(targets, r.GetFullName())
+		for _, r := range repos {
+			if r.GetArchived() {
+				continue
+			}
+			targets = append(targets, r.GetFullName())
+		}
+		if resp.NextPage == 0 {
+			return targets, nil
+		}
+		opts.Page = resp.NextPage
 	}
-	return targets, nil
 }
 
 // ScanRepositories scans each "owner/name" target. A repository that fails
@@ -111,7 +118,7 @@ func (s *Scanner) scanRepository(ctx context.Context, owner, name string) (*doma
 	findings = append(findings, s.judgeCoverage(obs)...)
 	findings = append(findings, s.judgePausedOrStalled(obs)...)
 	updates = append(updates, s.judgeExpectedUpdates(obs)...)
-	findings = append(findings, s.deriveVulnerableUnpatched(obs, updates)...)
+	findings = append(findings, s.deriveVulnerable(updates)...)
 
 	return &domain.RepositoryReport{
 		Repository:      owner + "/" + name,
@@ -155,13 +162,29 @@ func (s *Scanner) observe(ctx context.Context, owner, name string) (*observation
 	}
 	obs.securityFixes = fixes
 
-	obs.openAlerts, err = s.fetchAlerts(ctx, owner, name, "open")
+	obs.openAlerts, obs.alertsDisabled, err = s.fetchAlerts(ctx, owner, name, "open")
 	if err != nil {
 		return nil, "alerts_open", err
 	}
-	obs.fixedAlerts, err = s.fetchAlerts(ctx, owner, name, "fixed")
+	if !obs.alertsDisabled {
+		obs.fixedAlerts, _, err = s.fetchAlerts(ctx, owner, name, "fixed")
+		if err != nil {
+			return nil, "alerts_fixed", err
+		}
+	}
+
+	commits, resp, err := s.client.Repositories.ListCommits(ctx, owner, name, &github.CommitsListOptions{
+		Author:      dependabotLogin,
+		ListOptions: github.ListOptions{PerPage: 1},
+	})
 	if err != nil {
-		return nil, "alerts_fixed", err
+		// 409 means the repository has no commits at all.
+		if resp == nil || resp.StatusCode != 409 {
+			return nil, "commits", err
+		}
+	} else if len(commits) > 0 {
+		t := commits[0].GetCommit().GetCommitter().GetDate().Time
+		obs.lastBotCommit = &t
 	}
 
 	obs.openPRs, err = s.fetchBotPRs(ctx, owner, name, "open")
@@ -197,20 +220,30 @@ func (s *Scanner) observe(ctx context.Context, owner, name string) (*observation
 	return obs, "", nil
 }
 
-func (s *Scanner) fetchAlerts(ctx context.Context, owner, name, state string) ([]*github.DependabotAlert, error) {
+// fetchAlerts lists alerts in one state. GitHub answers 403 on this route
+// for three different reasons; only "alerts are disabled" is an answer
+// rather than a failure, and it must not be conflated with rate limiting
+// or a missing token scope — those are scan errors, or a vulnerable
+// repository would silently read as healthy.
+func (s *Scanner) fetchAlerts(ctx context.Context, owner, name, state string) (alerts []*github.DependabotAlert, disabled bool, err error) {
 	alerts, resp, err := s.client.Dependabot.ListRepoAlerts(ctx, owner, name, &github.ListAlertsOptions{
 		State:       github.Ptr(state),
 		ListOptions: github.ListOptions{PerPage: pageSize},
 	})
 	if err != nil {
-		// Dependabot alerts disabled for the repository surfaces as 403.
-		// That is an answer, not a failure: no alert source exists.
-		if resp != nil && resp.StatusCode == 403 {
-			return nil, nil
+		var rateErr *github.RateLimitError
+		var abuseErr *github.AbuseRateLimitError
+		if errors.As(err, &rateErr) || errors.As(err, &abuseErr) {
+			return nil, false, err
 		}
-		return nil, err
+		var ghErr *github.ErrorResponse
+		if resp != nil && resp.StatusCode == 403 && errors.As(err, &ghErr) &&
+			strings.Contains(strings.ToLower(ghErr.Message), "disabled") {
+			return nil, true, nil
+		}
+		return nil, false, err
 	}
-	return alerts, nil
+	return alerts, false, nil
 }
 
 func (s *Scanner) fetchBotPRs(ctx context.Context, owner, name, state string) ([]*github.PullRequest, error) {
@@ -234,7 +267,7 @@ func (s *Scanner) fetchBotPRs(ctx context.Context, owner, name, state string) ([
 // Renovate can change its login) is M1's adapter work.
 const dependabotLogin = "dependabot[bot]"
 
-func (s *Scanner) evidence(source, method, description string, confidence domain.Confidence) domain.Evidence {
+func (s *Scanner) evidence(source string, method domain.EvidenceMethod, description string, confidence domain.Confidence) domain.Evidence {
 	return domain.Evidence{
 		Source:      source,
 		Method:      method,
@@ -259,7 +292,7 @@ func (s *Scanner) judgeCoverage(obs *observation) []domain.Finding {
 		evidence := []domain.Evidence{
 			s.evidence(
 				apiRoute("GET /repos/%s/%s/git/trees/%s?recursive=1", obs.owner, obs.name, obs.defaultBranch),
-				"api_read",
+				domain.MethodAPIRead,
 				fmt.Sprintf("manifest %s (%s) is present on the default branch", m.Path, m.Ecosystem),
 				domain.Confirmed,
 			),
@@ -267,23 +300,40 @@ func (s *Scanner) judgeCoverage(obs *observation) []domain.Finding {
 		if obs.config == nil {
 			evidence = append(evidence, s.evidence(
 				apiRoute("GET /repos/%s/%s/contents/%s", obs.owner, obs.name, botConfigPath),
-				"api_read",
+				domain.MethodAPIRead,
 				"no .github/dependabot.yml exists on the default branch",
 				domain.Confirmed,
 			))
 		} else {
 			evidence = append(evidence, s.evidence(
 				apiRoute("GET /repos/%s/%s/contents/%s", obs.owner, obs.name, botConfigPath),
-				"api_read",
+				domain.MethodAPIRead,
 				fmt.Sprintf(".github/dependabot.yml has no %s entry whose directory covers %s", m.Ecosystem, m.directory()),
 				domain.Confirmed,
 			))
 		}
 		findings = append(findings, domain.Finding{
 			Type:       domain.CoverageGap,
-			Subject:    domain.Subject{Kind: "manifest", ID: m.Path},
+			Subject:    domain.Subject{Kind: domain.SubjectManifest, ID: m.Path},
 			Confidence: domain.WeakestLink(evidence),
 			Detail:     fmt.Sprintf("manifest %s (%s) has no covering update-bot configuration", m.Path, m.Ecosystem),
+			Evidence:   evidence,
+		})
+	}
+	// A repository with alerts disabled has no security-alert source at
+	// all — the security-feature half of coverage_gap's definition.
+	if obs.alertsDisabled {
+		evidence := []domain.Evidence{s.evidence(
+			apiRoute("GET /repos/%s/%s/dependabot/alerts", obs.owner, obs.name),
+			domain.MethodAPIRead,
+			"the alerts endpoint answered 403 with \"Dependabot alerts are disabled for this repository\"",
+			domain.Confirmed,
+		)}
+		findings = append(findings, domain.Finding{
+			Type:       domain.CoverageGap,
+			Subject:    domain.Subject{Kind: domain.SubjectBotConfig, ID: "dependabot-alerts"},
+			Confidence: domain.WeakestLink(evidence),
+			Detail:     "Dependabot alerts are disabled: no security-alert source exists for this repository",
 			Evidence:   evidence,
 		})
 	}
@@ -312,13 +362,13 @@ func (s *Scanner) judgePausedOrStalled(obs *observation) []domain.Finding {
 	if obs.securityFixes != nil && obs.securityFixes.GetPaused() {
 		evidence := []domain.Evidence{s.evidence(
 			apiRoute("GET /repos/%s/%s/automated-security-fixes", obs.owner, obs.name),
-			"api_read",
+			domain.MethodAPIRead,
 			"Dependabot security updates are paused for this repository",
 			domain.Confirmed,
 		)}
 		return []domain.Finding{{
 			Type:       domain.PausedOrStalled,
-			Subject:    domain.Subject{Kind: "bot_config", ID: botConfigPath},
+			Subject:    domain.Subject{Kind: domain.SubjectBotConfig, ID: botConfigPath},
 			Confidence: domain.WeakestLink(evidence),
 			Detail:     "Dependabot security updates are paused (GitHub pauses after 90 days of untouched PRs or repeated run failures)",
 			Evidence:   evidence,
@@ -332,59 +382,78 @@ func (s *Scanner) judgePausedOrStalled(obs *observation) []domain.Finding {
 		return nil
 	}
 
-	var last *github.PullRequest
+	// Bot output = PRs plus default-branch commits authored by the bot,
+	// whichever is newest. Squash merges keep the bot as commit author, so
+	// commits cover activity that PR pruning or renaming would hide.
+	var lastPR *github.PullRequest
 	for _, pr := range append(append([]*github.PullRequest{}, obs.openPRs...), obs.closedPRs...) {
-		if last == nil || pr.GetCreatedAt().Time.After(last.GetCreatedAt().Time) {
-			last = pr
+		if lastPR == nil || pr.GetCreatedAt().Time.After(lastPR.GetCreatedAt().Time) {
+			lastPR = pr
 		}
 	}
+	var lastActivity *time.Time
+	activityDescription := "no Dependabot pull request or default-branch bot commit is observable (newest 100 open and closed PRs; newest authored commit)"
+	if lastPR != nil {
+		t := lastPR.GetCreatedAt().Time
+		lastActivity = &t
+		activityDescription = fmt.Sprintf("newest Dependabot pull request #%d was created %s", lastPR.GetNumber(), t.Format(time.RFC3339))
+	}
+	if obs.lastBotCommit != nil && (lastActivity == nil || obs.lastBotCommit.After(*lastActivity)) {
+		lastActivity = obs.lastBotCommit
+		activityDescription = fmt.Sprintf("newest default-branch commit authored by the bot is from %s", obs.lastBotCommit.Format(time.RFC3339))
+	}
+
 	window := 0
 	for _, e := range obs.config.Updates {
 		if w := entryWindowDays(e); w > window {
 			window = w
 		}
 	}
-
-	var gapDescription string
-	if last != nil {
-		gapDays := int(s.now().Sub(last.GetCreatedAt().Time).Hours() / 24)
+	if lastActivity != nil {
+		gapDays := int(s.now().Sub(*lastActivity).Hours() / 24)
 		if gapDays <= window {
 			return nil
 		}
-		gapDescription = fmt.Sprintf("newest Dependabot pull request #%d was created %d days ago", last.GetNumber(), gapDays)
-	} else {
-		gapDescription = "no Dependabot pull request is observable (newest 100 open and closed PRs)"
+		activityDescription += fmt.Sprintf(" (%d days ago)", gapDays)
+	}
+
+	// Describe exactly what the security-fixes endpoint answered — never
+	// more. A 404 is itself the observation.
+	fixesDescription := "the automated-security-fixes state could not be observed (endpoint answered 404)"
+	if obs.securityFixes != nil {
+		fixesDescription = fmt.Sprintf("Dependabot security updates: enabled=%t, paused=%t",
+			obs.securityFixes.GetEnabled(), obs.securityFixes.GetPaused())
 	}
 
 	evidence := []domain.Evidence{
 		s.evidence(
 			apiRoute("GET /repos/%s/%s/contents/%s", obs.owner, obs.name, botConfigPath),
-			"api_read",
+			domain.MethodAPIRead,
 			fmt.Sprintf("dependabot.yml schedules %d update entries; the most lenient expected-output window is %d days (2 intervals + cooldown)", len(obs.config.Updates), window),
 			domain.Confirmed,
 		),
 		s.evidence(
 			apiRoute("GET /repos/%s/%s/automated-security-fixes", obs.owner, obs.name),
-			"api_read",
-			"Dependabot security updates are enabled and not paused",
+			domain.MethodAPIRead,
+			fixesDescription,
 			domain.Confirmed,
 		),
 		s.evidence(
-			apiRoute("GET /repos/%s/%s/pulls", obs.owner, obs.name),
-			"api_read",
-			gapDescription,
+			apiRoute("GET /repos/%s/%s/pulls, /repos/%s/%s/commits?author=%s", obs.owner, obs.name, obs.owner, obs.name, dependabotLogin),
+			domain.MethodAPIRead,
+			activityDescription,
 			domain.Confirmed,
 		),
 		s.evidence(
 			"rule:stall_inference",
-			"inference",
+			domain.MethodInference,
 			fmt.Sprintf("no bot output within the %d-day window suggests scheduled runs are not happening; runs may also have found nothing to update, so this is an estimate, not an observation", window),
 			domain.Inferred,
 		),
 	}
 	return []domain.Finding{{
 		Type:       domain.PausedOrStalled,
-		Subject:    domain.Subject{Kind: "bot_config", ID: botConfigPath},
+		Subject:    domain.Subject{Kind: domain.SubjectBotConfig, ID: botConfigPath},
 		Confidence: domain.WeakestLink(evidence),
 		Detail:     "expected Dependabot runs are not observable",
 		Evidence:   evidence,
@@ -395,8 +464,4 @@ func (s *Scanner) judgeExpectedUpdates(obs *observation) []domain.ExpectedUpdate
 	advisory, used := s.advisoryUpdates(obs)
 	updates := append(advisory, s.versionUpdates(obs, used)...)
 	return append(updates, s.effectiveUpdates(obs)...)
-}
-
-func (s *Scanner) deriveVulnerableUnpatched(obs *observation, updates []domain.ExpectedUpdate) []domain.Finding {
-	return s.deriveVulnerable(updates)
 }

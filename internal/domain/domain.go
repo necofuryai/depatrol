@@ -14,15 +14,25 @@ const (
 	Inferred  Confidence = "inferred"
 )
 
+// EvidenceMethod says how an observation was made.
+type EvidenceMethod string
+
+const (
+	MethodAPIRead    EvidenceMethod = "api_read"   // a field read directly from an API response
+	MethodParse      EvidenceMethod = "parse"      // interpreted from bot output (titles, branch names)
+	MethodInference  EvidenceMethod = "inference"  // estimated from indirect signals
+	MethodDerivation EvidenceMethod = "derivation" // computed from other judgments
+)
+
 // Evidence is a single first-class observation backing a judgment.
 type Evidence struct {
 	// Source identifies where the observation came from, e.g. an API route
 	// or the name of an inference rule.
-	Source      string     `json:"source"`
-	Method      string     `json:"method"` // "api_read" | "inference" | "parse"
-	Description string     `json:"description"`
-	Confidence  Confidence `json:"confidence"`
-	ObservedAt  time.Time  `json:"observed_at"`
+	Source      string         `json:"source"`
+	Method      EvidenceMethod `json:"method"`
+	Description string         `json:"description"`
+	Confidence  Confidence     `json:"confidence"`
+	ObservedAt  time.Time      `json:"observed_at"`
 }
 
 // WeakestLink derives a judgment's confidence from its evidence: one
@@ -36,10 +46,19 @@ func WeakestLink(evidence []Evidence) Confidence {
 	return Confirmed
 }
 
+// SubjectKind names the kinds of things a Finding can be attached to.
+type SubjectKind string
+
+const (
+	SubjectManifest       SubjectKind = "manifest"
+	SubjectBotConfig      SubjectKind = "bot_config"
+	SubjectExpectedUpdate SubjectKind = "expected_update"
+)
+
 // Subject is what a Finding is attached to.
 type Subject struct {
-	Kind string `json:"kind"` // "manifest" | "bot_config" | "expected_update"
-	ID   string `json:"id"`
+	Kind SubjectKind `json:"kind"`
+	ID   string      `json:"id"`
 }
 
 type FindingType string
@@ -147,10 +166,18 @@ type ScanError struct {
 	Message    string `json:"message"`
 }
 
+// Target records what the scan was asked to cover, so a repository that
+// silently fell out of the scan is detectable from the report alone.
+type Target struct {
+	Org   string   `json:"org,omitempty"`
+	Repos []string `json:"repos,omitempty"`
+}
+
 // Report is the stateless snapshot a scan produces. JSON is the primary
 // contract; the table output is a projection of this.
 type Report struct {
 	ObservedAt   time.Time          `json:"observed_at"`
+	Target       Target             `json:"target"`
 	Repositories []RepositoryReport `json:"repositories"`
 	ScanErrors   []ScanError        `json:"scan_errors"`
 }

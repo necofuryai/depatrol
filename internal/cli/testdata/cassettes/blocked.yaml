@@ -156,7 +156,7 @@ interactions:
     proto_minor: 0
     content_length: -1
     uncompressed: true
-    body: '[{"number":80,"state":"open","title":"Bump ci-dep from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/ci-dep-1.1.0","sha":"aa8001"},"base":{"ref":"main"}},{"number":81,"state":"open","title":"Bump conflict-dep from 2.0.0 to 2.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/conflict-dep-2.1.0","sha":"bb8101"},"base":{"ref":"main"}},{"number":82,"state":"open","title":"Bump review-dep from 3.0.0 to 3.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/review-dep-3.1.0","sha":"cc8201"},"base":{"ref":"main"}}]'
+    body: '[{"number":80,"state":"open","title":"Bump ci-dep from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/ci-dep-1.1.0","sha":"aa8001"},"base":{"ref":"main"}},{"number":81,"state":"open","title":"Bump conflict-dep from 2.0.0 to 2.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/conflict-dep-2.1.0","sha":"bb8101"},"base":{"ref":"main"}},{"number":82,"state":"open","title":"Bump review-dep from 3.0.0 to 3.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/review-dep-3.1.0","sha":"cc8201"},"base":{"ref":"main"}},{"number":83,"state":"open","title":"Bump wait-dep from 4.0.0 to 4.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-20T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/wait-dep-4.1.0","sha":"dd8301"},"base":{"ref":"main"}}]'
     headers:
       Content-Type:
       - application/json; charset=utf-8
@@ -194,6 +194,29 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
+    url: https://api.github.com/repos/acme/stuck/commits?author=dependabot%5Bbot%5D&per_page=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 9
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
     url: https://api.github.com/repos/acme/stuck/pulls/80
     method: GET
   response:
@@ -208,7 +231,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 9
+- id: 10
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -231,7 +254,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 10
+- id: 11
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -254,7 +277,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 11
+- id: 12
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -277,7 +300,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 12
+- id: 13
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -300,7 +323,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 13
+- id: 14
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -323,7 +346,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 14
+- id: 15
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -346,7 +369,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 15
+- id: 16
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -369,7 +392,7 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 16
+- id: 17
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -387,6 +410,75 @@ interactions:
     content_length: -1
     uncompressed: true
     body: '{"total_count":1,"check_runs":[{"id":4,"name":"test","status":"completed","conclusion":"success"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 18
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/stuck/pulls/83
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"number":83,"state":"open","title":"Bump wait-dep from 4.0.0 to 4.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-20T12:00:00Z","mergeable":true,"mergeable_state":"blocked","requested_reviewers":[{"login":"bob"}],"head":{"ref":"dependabot/npm_and_yarn/wait-dep-4.1.0","sha":"dd8301"},"base":{"ref":"main"}}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 19
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/stuck/pulls/83/reviews?per_page=100
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 20
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/stuck/commits/dd8301/check-runs
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"total_count":1,"check_runs":[{"id":5,"name":"test","status":"completed","conclusion":"success"}]}'
     headers:
       Content-Type:
       - application/json; charset=utf-8

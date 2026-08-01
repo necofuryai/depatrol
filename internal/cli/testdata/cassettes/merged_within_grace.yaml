@@ -10,7 +10,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown
+    url: https://api.github.com/repos/acme/justmerged
     method: GET
   response:
     proto: HTTP/2.0
@@ -18,7 +18,7 @@ interactions:
     proto_minor: 0
     content_length: -1
     uncompressed: true
-    body: '{"id":9,"name":"cooldown","full_name":"acme/cooldown","owner":{"login":"acme"},"default_branch":"main","archived":false}'
+    body: '{"id":9,"name":"justmerged","full_name":"acme/justmerged","owner":{"login":"acme"},"default_branch":"main","archived":false}'
     headers:
       Content-Type:
       - application/json; charset=utf-8
@@ -33,7 +33,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/git/trees/main?recursive=1
+    url: https://api.github.com/repos/acme/justmerged/git/trees/main?recursive=1
     method: GET
   response:
     proto: HTTP/2.0
@@ -41,7 +41,7 @@ interactions:
     proto_minor: 0
     content_length: -1
     uncompressed: true
-    body: '{"sha":"3c4d5e","tree":[{"path":"package.json","type":"blob"},{"path":".github/dependabot.yml","type":"blob"}],"truncated":false}'
+    body: '{"sha":"5e6f7a","tree":[{"path":"package.json","type":"blob"},{"path":".github/dependabot.yml","type":"blob"}],"truncated":false}'
     headers:
       Content-Type:
       - application/json; charset=utf-8
@@ -56,7 +56,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/contents/.github/dependabot.yml?ref=main
+    url: https://api.github.com/repos/acme/justmerged/contents/.github/dependabot.yml?ref=main
     method: GET
   response:
     proto: HTTP/2.0
@@ -64,7 +64,7 @@ interactions:
     proto_minor: 0
     content_length: -1
     uncompressed: true
-    body: '{"type":"file","encoding":"base64","name":"dependabot.yml","path":".github/dependabot.yml","content":"dmVyc2lvbjogMgp1cGRhdGVzOgogIC0gcGFja2FnZS1lY29zeXN0ZW06ICJucG0iCiAgICBkaXJlY3Rvcnk6ICIvIgogICAgc2NoZWR1bGU6CiAgICAgIGludGVydmFsOiAid2Vla2x5IgogICAgY29vbGRvd246CiAgICAgIGRlZmF1bHQtZGF5czogMTQK"}'
+    body: '{"type":"file","encoding":"base64","name":"dependabot.yml","path":".github/dependabot.yml","content":"dmVyc2lvbjogMgp1cGRhdGVzOgogIC0gcGFja2FnZS1lY29zeXN0ZW06ICJucG0iCiAgICBkaXJlY3Rvcnk6ICIvIgogICAgc2NoZWR1bGU6CiAgICAgIGludGVydmFsOiAid2Vla2x5Igo="}'
     headers:
       Content-Type:
       - application/json; charset=utf-8
@@ -79,7 +79,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/automated-security-fixes
+    url: https://api.github.com/repos/acme/justmerged/automated-security-fixes
     method: GET
   response:
     proto: HTTP/2.0
@@ -102,7 +102,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/dependabot/alerts?per_page=100&state=open
+    url: https://api.github.com/repos/acme/justmerged/dependabot/alerts?per_page=100&state=open
     method: GET
   response:
     proto: HTTP/2.0
@@ -110,7 +110,7 @@ interactions:
     proto_minor: 0
     content_length: -1
     uncompressed: true
-    body: '[]'
+    body: '[{"number":30,"state":"open","dependency":{"package":{"ecosystem":"npm","name":"lodash"},"manifest_path":"package.json","scope":"runtime"},"security_advisory":{"ghsa_id":"GHSA-aaaa-bbbb-cccc","severity":"high","summary":"Prototype pollution in lodash"},"security_vulnerability":{"package":{"ecosystem":"npm","name":"lodash"},"severity":"high","vulnerable_version_range":"< 4.17.21","first_patched_version":{"identifier":"4.17.21"}},"created_at":"2026-07-10T00:00:00Z","updated_at":"2026-08-01T10:00:00Z","html_url":"https://github.com/acme/justmerged/security/dependabot/30"}]'
     headers:
       Content-Type:
       - application/json; charset=utf-8
@@ -125,7 +125,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/dependabot/alerts?per_page=100&state=fixed
+    url: https://api.github.com/repos/acme/justmerged/dependabot/alerts?per_page=100&state=fixed
     method: GET
   response:
     proto: HTTP/2.0
@@ -148,7 +148,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/pulls?per_page=100&state=open
+    url: https://api.github.com/repos/acme/justmerged/pulls?per_page=100&state=open
     method: GET
   response:
     proto: HTTP/2.0
@@ -171,7 +171,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/pulls?per_page=100&state=closed
+    url: https://api.github.com/repos/acme/justmerged/pulls?per_page=100&state=closed
     method: GET
   response:
     proto: HTTP/2.0
@@ -179,13 +179,13 @@ interactions:
     proto_minor: 0
     content_length: -1
     uncompressed: true
-    body: '[{"number":7,"state":"closed","title":"Bump lodash from 1.0.0 to 1.0.1","user":{"login":"dependabot[bot]"},"created_at":"2026-07-14T12:00:00Z","merged_at":"2026-07-15T09:00:00Z","head":{"ref":"dependabot/npm_and_yarn/lodash-1.0.1","sha":"aa11"},"base":{"ref":"main"}},{"number":8,"state":"closed","title":"Add feature","user":{"login":"alice"},"created_at":"2026-07-30T12:00:00Z","merged_at":"2026-07-30T15:00:00Z","head":{"ref":"feature","sha":"bb22"},"base":{"ref":"main"}}]'
+    body: '[{"number":95,"state":"closed","title":"Bump lodash from 4.17.20 to 4.17.21","user":{"login":"dependabot[bot]"},"created_at":"2026-08-01T09:00:00Z","merged_at":"2026-08-01T10:00:00Z","head":{"ref":"dependabot/npm_and_yarn/lodash-4.17.21","sha":"ab9501"},"base":{"ref":"main"}}]'
     headers:
       Content-Type:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
-- id: 90
+- id: 8
   request:
     proto: HTTP/1.1
     proto_major: 1
@@ -194,7 +194,7 @@ interactions:
     host: api.github.com
     body: ""
     headers: {}
-    url: https://api.github.com/repos/acme/cooldown/commits?author=dependabot%5Bbot%5D&per_page=1
+    url: https://api.github.com/repos/acme/justmerged/commits?author=dependabot%5Bbot%5D&per_page=1
     method: GET
   response:
     proto: HTTP/2.0

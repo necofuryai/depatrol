@@ -185,3 +185,26 @@ interactions:
       - application/json; charset=utf-8
     status: 200 OK
     code: 200
+- id: 90
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/commits?author=dependabot%5Bbot%5D&per_page=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"message":"Git Repository is empty."}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 409 Conflict
+    code: 409

@@ -22,7 +22,11 @@ var fixedNow = time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 // The structs below restate the JSON contract independently of the
 // production types on purpose: if the contract drifts, these tests fail.
 type reportJSON struct {
-	ObservedAt   string           `json:"observed_at"`
+	ObservedAt string `json:"observed_at"`
+	Target     struct {
+		Org   string   `json:"org,omitempty"`
+		Repos []string `json:"repos,omitempty"`
+	} `json:"target"`
 	Repositories []repositoryJSON `json:"repositories"`
 	ScanErrors   []scanErrorJSON  `json:"scan_errors"`
 }
@@ -382,13 +386,17 @@ func TestScanExplainsBlockedPRs(t *testing.T) {
 	report := scanReport(t, "blocked", "--repo", "acme/stuck")
 	repo := singleRepo(t, report)
 
-	if len(repo.ExpectedUpdates) != 3 {
-		t.Fatalf("expected_updates = %+v, want three", repo.ExpectedUpdates)
+	if len(repo.ExpectedUpdates) != 4 {
+		t.Fatalf("expected_updates = %+v, want four", repo.ExpectedUpdates)
 	}
-	cases := []struct{ dep, reason string }{
-		{"ci-dep", "ci_failing"},
-		{"conflict-dep", "merge_conflict"},
-		{"review-dep", "changes_requested"},
+	cases := []struct{ dep, reason, confidence string }{
+		{"ci-dep", "ci_failing", "confirmed"},
+		{"conflict-dep", "merge_conflict", "confirmed"},
+		{"review-dep", "changes_requested", "confirmed"},
+		// wait-dep has reviewers requested for 12 days and no review at
+		// all: review-wait is an inference (a required review cannot be
+		// observed directly with read-only credentials), so inferred.
+		{"wait-dep", "review_pending", "inferred"},
 	}
 	for _, c := range cases {
 		u := findUpdate(t, repo, c.dep)
@@ -398,16 +406,16 @@ func TestScanExplainsBlockedPRs(t *testing.T) {
 		if !hasReason(u.BlockedReasons, c.reason) {
 			t.Errorf("%s: blocked_reasons = %v, want %s", c.dep, u.BlockedReasons, c.reason)
 		}
-		if u.Confidence != "confirmed" {
-			t.Errorf("%s: confidence = %q, want confirmed: every blocked reason is a direct observation", c.dep, u.Confidence)
+		if u.Confidence != c.confidence {
+			t.Errorf("%s: confidence = %q, want %s", c.dep, u.Confidence, c.confidence)
 		}
-		requireAllEvidence(t, u.Evidence, "confirmed")
+		requireAllEvidence(t, u.Evidence, "")
 	}
 	if repo.Rollup.Label != "blocked" {
 		t.Errorf("rollup label = %q, want blocked", repo.Rollup.Label)
 	}
-	if repo.Rollup.Counts["blocked"] != 3 {
-		t.Errorf("counts = %v, want blocked: 3", repo.Rollup.Counts)
+	if repo.Rollup.Counts["blocked"] != 4 {
+		t.Errorf("counts = %v, want blocked: 4", repo.Rollup.Counts)
 	}
 }
 
@@ -483,13 +491,91 @@ func TestScanContinuesPastBrokenRepository(t *testing.T) {
 	}
 }
 
-func TestScanOrgSkipsArchivedRepositories(t *testing.T) {
-	// The cassette holds no interactions for acme/attic (archived): if the
-	// scanner tried to scan it, replay-only mode would fail the request.
+func TestScanOrgPaginatesAndSkipsArchivedRepositories(t *testing.T) {
+	// The org listing spans two pages (Link header) and includes an
+	// archived repository. The cassette holds no interactions for
+	// acme/attic (archived): if the scanner tried to scan it, replay-only
+	// mode would fail the request. acme/empty2 lives on page 2, so a
+	// non-paginating implementation reports only one repository.
 	report := scanReport(t, "org_scan", "--org", "acme")
+
+	if report.Target.Org != "acme" {
+		t.Errorf("target.org = %q, want acme", report.Target.Org)
+	}
+	if len(report.ScanErrors) != 0 {
+		t.Fatalf("unexpected scan errors: %+v", report.ScanErrors)
+	}
+	var names []string
+	for _, r := range report.Repositories {
+		names = append(names, r.Repository)
+	}
+	if len(names) != 2 || names[0] != "acme/empty" || names[1] != "acme/empty2" {
+		t.Errorf("repositories = %v, want [acme/empty acme/empty2]", names)
+	}
+}
+
+func TestScanReportsAlertsDisabledAsCoverageGap(t *testing.T) {
+	report := scanReport(t, "alerts_disabled", "--repo", "acme/noalerts")
 	repo := singleRepo(t, report)
-	if repo.Repository != "acme/empty" {
-		t.Errorf("repository = %q, want acme/empty", repo.Repository)
+
+	f := findFinding(t, repo, "coverage_gap")
+	if f.Subject.Kind != "bot_config" || f.Subject.ID != "dependabot-alerts" {
+		t.Errorf("subject = %+v, want bot_config dependabot-alerts", f.Subject)
+	}
+	if f.Confidence != "confirmed" {
+		t.Errorf("confidence = %q, want confirmed: the 403 body names the reason", f.Confidence)
+	}
+	requireAllEvidence(t, f.Evidence, "confirmed")
+	if repo.Rollup.Label != "coverage_gap" {
+		t.Errorf("rollup label = %q, want coverage_gap: the security-alert source does not exist", repo.Rollup.Label)
+	}
+}
+
+func TestScanRateLimit403BecomesScanError(t *testing.T) {
+	// A primary rate-limit 403 on the alerts route must not be read as
+	// "alerts disabled" and silently produce a healthy repository.
+	report := scanReport(t, "alerts_rate_limited", "--repo", "acme/limited")
+
+	if len(report.Repositories) != 0 {
+		t.Errorf("repositories = %+v, want none", report.Repositories)
+	}
+	if len(report.ScanErrors) != 1 {
+		t.Fatalf("scan_errors = %+v, want exactly one", report.ScanErrors)
+	}
+	e := report.ScanErrors[0]
+	if e.Repository != "acme/limited" || e.Stage != "alerts_open" {
+		t.Errorf("scan error = %+v, want alerts_open stage for acme/limited", e)
+	}
+}
+
+func TestScanAcknowledgesMergeAwaitingReevaluation(t *testing.T) {
+	// The PR merged two hours ago; GitHub's re-evaluation gets a grace
+	// period before merged_not_effective. Within it, the judgment must
+	// acknowledge the observed merge instead of claiming no PR exists.
+	report := scanReport(t, "merged_within_grace", "--repo", "acme/justmerged")
+	repo := singleRepo(t, report)
+
+	u := singleUpdate(t, repo)
+	if u.State == "merged_not_effective" {
+		t.Fatalf("state = merged_not_effective inside the grace window: the false-positive guard is gone")
+	}
+	if u.State != "pending" {
+		t.Errorf("state = %q, want pending (awaiting re-evaluation)", u.State)
+	}
+	if !strings.Contains(u.Detail, "#95") || !strings.Contains(u.Detail, "merged") {
+		t.Errorf("detail = %q, must acknowledge the observed merge of PR #95", u.Detail)
+	}
+	var mentionsMerge bool
+	for _, e := range u.Evidence {
+		if strings.Contains(e.Description, "merged") {
+			mentionsMerge = true
+		}
+		if strings.Contains(e.Description, "no open Dependabot pull request") {
+			t.Errorf("evidence claims no PR exists although a merge was observed: %q", e.Description)
+		}
+	}
+	if !mentionsMerge {
+		t.Error("evidence chain must contain the merged-PR observation")
 	}
 }
 
@@ -498,10 +584,13 @@ func TestTableOutputProjectsTheReport(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d\nstderr: %s", code, stderr)
 	}
-	for _, want := range []string{"REPOSITORY", "acme/empty", "healthy"} {
+	for _, want := range []string{"REPOSITORY", "ROLLUP", "acme/empty", "healthy"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("table output missing %q:\n%s", want, stdout)
 		}
+	}
+	if strings.Contains(stdout, "STATE") {
+		t.Errorf("table output uses STATE for the rollup label, which CONTEXT.md reserves for lifecycle positions:\n%s", stdout)
 	}
 }
 
@@ -514,11 +603,39 @@ func TestUsageErrorsExitTwo(t *testing.T) {
 	}
 }
 
+func TestScanRecordedHealthyRepository(t *testing.T) {
+	// M0 pass criteria 1 and 2 against a cassette recorded from a real
+	// repository (real API shape, credentials scrubbed): no stall false
+	// positive on a known-healthy repository, and every judgment carries
+	// a complete evidence chain. Re-record via TestRecordRealCassette.
+	report := scanReport(t, "recorded_necofuryai_dev", "--repo", "necofuryai/necofuryai.dev")
+
+	if len(report.ScanErrors) != 0 {
+		t.Fatalf("scan errors on the recorded healthy repository: %+v", report.ScanErrors)
+	}
+	if len(report.Repositories) != 1 {
+		t.Fatalf("got %d repositories, want 1", len(report.Repositories))
+	}
+	repo := report.Repositories[0]
+	for _, f := range repo.Findings {
+		if f.Type == "paused_or_stalled" {
+			t.Errorf("false stall on a known-healthy repository (M0 pass criterion 2): %+v", f)
+		}
+		requireAllEvidence(t, f.Evidence, "")
+	}
+	for _, u := range repo.ExpectedUpdates {
+		requireAllEvidence(t, u.Evidence, "")
+	}
+}
+
 func TestScanHealthyEmptyRepository(t *testing.T) {
 	report := scanReport(t, "healthy_empty", "--repo", "acme/empty")
 
 	if report.ObservedAt != "2026-08-01T12:00:00Z" {
 		t.Errorf("observed_at = %q, want the injected clock instant", report.ObservedAt)
+	}
+	if len(report.Target.Repos) != 1 || report.Target.Repos[0] != "acme/empty" {
+		t.Errorf("target.repos = %v, want [acme/empty]", report.Target.Repos)
 	}
 	repo := singleRepo(t, report)
 	if repo.Repository != "acme/empty" {

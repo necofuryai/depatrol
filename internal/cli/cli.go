@@ -14,9 +14,26 @@ import (
 
 	"github.com/google/go-github/v89/github"
 	"github.com/spf13/cobra"
+	"golang.org/x/time/rate"
 
+	"github.com/necofuryai/depatrol/internal/domain"
 	"github.com/necofuryai/depatrol/internal/scan"
 )
+
+// pacedTransport paces every request so an organization scan cannot
+// exhaust the shared API quota (spec user story 19). Secondary rate
+// limits are additionally waited out by the go-github client itself.
+type pacedTransport struct {
+	base    http.RoundTripper
+	limiter *rate.Limiter
+}
+
+func (t *pacedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if err := t.limiter.Wait(req.Context()); err != nil {
+		return nil, err
+	}
+	return t.base.RoundTrip(req)
+}
 
 // Options carries the injection points. Zero values mean production
 // defaults.
@@ -80,7 +97,7 @@ func newScanCmd(opts Options) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "scan",
-		Short: "Scan repositories and report their state with evidence",
+		Short: "Scan repositories and report their conditions with evidence",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(repos) == 0 && org == "" {
 				return &usageError{"at least one --repo owner/name or an --org is required"}
@@ -97,8 +114,12 @@ func newScanCmd(opts Options) *cobra.Command {
 			}
 
 			client, err := github.NewClient(
-				github.WithTransport(opts.Transport),
+				github.WithTransport(&pacedTransport{
+					base:    opts.Transport,
+					limiter: rate.NewLimiter(rate.Limit(8), 8),
+				}),
 				github.WithAuthToken(token),
+				github.WithMaxSecondaryRateLimitRetryAfterDuration(time.Minute),
 			)
 			if err != nil {
 				return err
@@ -115,6 +136,7 @@ func newScanCmd(opts Options) *cobra.Command {
 			}
 
 			report := scanner.ScanRepositories(cmd.Context(), targets)
+			report.Target = domain.Target{Org: org, Repos: repos}
 
 			switch output {
 			case "json":

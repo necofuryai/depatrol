@@ -44,19 +44,26 @@ func detectManifests(paths []string) []manifest {
 	return out
 }
 
-// directory returns the dependabot.yml directory that would cover this
-// manifest: "/" for the repository root, "/sub/dir" otherwise. Workflow
-// files are covered by a github-actions entry with directory "/" by
-// Dependabot convention.
-func (m manifest) directory() string {
-	if m.Ecosystem == "github-actions" {
-		return "/"
-	}
-	dir := path.Dir(m.Path)
+// directoryOf maps a file path to the shared directory vocabulary used by
+// dependabot.yml entries, PR titles, and alert manifest paths: "/" for the
+// repository root, "/sub/dir" otherwise. Config-coverage matching and
+// alert-to-PR matching must agree on this, so there is exactly one copy.
+func directoryOf(p string) string {
+	dir := path.Dir(p)
 	if dir == "." {
 		return "/"
 	}
 	return "/" + dir
+}
+
+// directory returns the dependabot.yml directory that would cover this
+// manifest. Workflow files are covered by a github-actions entry with
+// directory "/" by Dependabot convention.
+func (m manifest) directory() string {
+	if m.Ecosystem == "github-actions" {
+		return "/"
+	}
+	return directoryOf(m.Path)
 }
 
 // covers reports whether the entry covers the manifest: same ecosystem and

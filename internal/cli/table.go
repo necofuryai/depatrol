@@ -14,12 +14,18 @@ import (
 // primary contract; this view adds no information of its own.
 func renderTable(w io.Writer, report *domain.Report) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "REPOSITORY\tSTATE\tCONDITIONS")
+	// The column is the rollup label, never "state": CONTEXT.md reserves
+	// state for lifecycle positions. Scan errors are listed apart — the
+	// inability to judge must not read like a judged condition.
+	fmt.Fprintln(tw, "REPOSITORY\tROLLUP\tCONDITIONS")
 	for _, r := range report.Repositories {
 		fmt.Fprintf(tw, "%s\t%s\t%s\n", r.Repository, r.Rollup.Label, formatCounts(r.Rollup.Counts))
 	}
-	for _, e := range report.ScanErrors {
-		fmt.Fprintf(tw, "%s\tscan_error\t%s: %s\n", e.Repository, e.Stage, e.Message)
+	if len(report.ScanErrors) > 0 {
+		fmt.Fprintln(tw, "\nSCAN ERRORS")
+		for _, e := range report.ScanErrors {
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", e.Repository, e.Stage, e.Message)
+		}
 	}
 	return tw.Flush()
 }
