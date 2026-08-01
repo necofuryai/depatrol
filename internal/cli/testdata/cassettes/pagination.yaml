@@ -1,0 +1,542 @@
+---
+version: 2
+interactions:
+- id: 0
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"id":31,"name":"paged","full_name":"acme/paged","owner":{"login":"acme"},"default_branch":"main","archived":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 1
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/git/trees/main?recursive=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"sha":"abc123","tree":[{"path":"package.json","type":"blob"},{"path":".github/dependabot.yml","type":"blob"}],"truncated":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 2
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/contents/.github/dependabot.yml?ref=main
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"type":"file","encoding":"base64","name":"dependabot.yml","path":".github/dependabot.yml","content":"dmVyc2lvbjogMgp1cGRhdGVzOgogIC0gcGFja2FnZS1lY29zeXN0ZW06ICJucG0iCiAgICBkaXJlY3Rvcnk6ICIvIgogICAgc2NoZWR1bGU6CiAgICAgIGludGVydmFsOiAid2Vla2x5Igo="}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 3
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/automated-security-fixes
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"enabled":true,"paused":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 4
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/dependabot/alerts?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+      Link:
+      - <https://api.github.com/repos/acme/paged/dependabot/alerts?page=2&per_page=100&state=open>; rel="next"
+    status: 200 OK
+    code: 200
+- id: 5
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/dependabot/alerts?page=2&per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":41,"state":"open","dependency":{"package":{"ecosystem":"npm","name":"axios"},"manifest_path":"package.json","scope":"runtime"},"security_advisory":{"ghsa_id":"GHSA-page-open-0001","severity":"high"},"security_vulnerability":{"package":{"ecosystem":"npm","name":"axios"},"severity":"high","vulnerable_version_range":"< 1.1.0","first_patched_version":{"identifier":"1.1.0"}},"created_at":"2026-07-20T00:00:00Z"},{"number":42,"state":"open","dependency":{"package":{"ecosystem":"npm","name":"lodash"},"manifest_path":"package.json","scope":"runtime"},"security_advisory":{"ghsa_id":"GHSA-page-closed-002","severity":"high"},"security_vulnerability":{"package":{"ecosystem":"npm","name":"lodash"},"severity":"high","vulnerable_version_range":"< 4.17.21","first_patched_version":{"identifier":"4.17.21"}},"created_at":"2026-07-10T00:00:00Z"}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 6
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/dependabot/alerts?per_page=100&state=fixed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 7
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/commits?author=dependabot%5Bbot%5D&per_page=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 8
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":1,"state":"open","title":"Human change","user":{"login":"alice"},"created_at":"2026-07-31T00:00:00Z","head":{"ref":"feature","sha":"human01"},"base":{"ref":"main"}}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+      Link:
+      - <https://api.github.com/repos/acme/paged/pulls?page=2&per_page=100&state=open>; rel="next"
+    status: 200 OK
+    code: 200
+- id: 9
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls?page=2&per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":101,"state":"open","title":"Bump axios from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-29T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/axios-1.1.0","sha":"axios101"},"base":{"ref":"main"}},{"number":102,"state":"open","title":"Bump review-dep from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/review-dep-1.1.0","sha":"review102"},"base":{"ref":"main"}},{"number":103,"state":"open","title":"Bump ci-dep from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/ci-dep-1.1.0","sha":"ci103"},"base":{"ref":"main"}}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 10
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls?per_page=100&state=closed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":2,"state":"closed","title":"Human merge","user":{"login":"alice"},"created_at":"2026-07-30T00:00:00Z","merged_at":"2026-07-30T01:00:00Z","head":{"ref":"feature-two","sha":"human02"},"base":{"ref":"main"}}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+      Link:
+      - <https://api.github.com/repos/acme/paged/pulls?page=2&per_page=100&state=closed>; rel="next"
+    status: 200 OK
+    code: 200
+- id: 11
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls?page=2&per_page=100&state=closed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":104,"state":"closed","title":"Bump lodash from 4.17.20 to 4.17.21","user":{"login":"dependabot[bot]"},"created_at":"2026-07-24T12:00:00Z","merged_at":"2026-07-25T12:00:00Z","head":{"ref":"dependabot/npm_and_yarn/lodash-4.17.21","sha":"lodash104"},"base":{"ref":"main"}}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 12
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls/101
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"number":101,"state":"open","title":"Bump axios from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-29T12:00:00Z","mergeable":true,"mergeable_state":"clean","head":{"ref":"dependabot/npm_and_yarn/axios-1.1.0","sha":"axios101"},"base":{"ref":"main"}}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 13
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls/101/reviews?per_page=100
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 14
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/commits/axios101/check-runs
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"total_count":1,"check_runs":[{"id":101,"name":"test","status":"completed","conclusion":"success"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 15
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls/102
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"number":102,"state":"open","title":"Bump review-dep from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","mergeable":true,"mergeable_state":"blocked","head":{"ref":"dependabot/npm_and_yarn/review-dep-1.1.0","sha":"review102"},"base":{"ref":"main"}}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 16
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls/102/reviews?per_page=100
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"id":201,"state":"APPROVED","user":{"login":"bob"},"submitted_at":"2026-07-29T08:00:00Z"}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+      Link:
+      - <https://api.github.com/repos/acme/paged/pulls/102/reviews?page=2&per_page=100>; rel="next"
+    status: 200 OK
+    code: 200
+- id: 17
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls/102/reviews?page=2&per_page=100
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"id":202,"state":"CHANGES_REQUESTED","user":{"login":"bob"},"submitted_at":"2026-07-30T08:00:00Z"}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 18
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/commits/review102/check-runs
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"total_count":1,"check_runs":[{"id":102,"name":"test","status":"completed","conclusion":"success"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 19
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls/103
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"number":103,"state":"open","title":"Bump ci-dep from 1.0.0 to 1.1.0","user":{"login":"dependabot[bot]"},"created_at":"2026-07-28T12:00:00Z","mergeable":true,"mergeable_state":"blocked","head":{"ref":"dependabot/npm_and_yarn/ci-dep-1.1.0","sha":"ci103"},"base":{"ref":"main"}}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 20
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/pulls/103/reviews?per_page=100
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 21
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/commits/ci103/check-runs
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"total_count":2,"check_runs":[{"id":103,"name":"lint","status":"completed","conclusion":"success"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+      Link:
+      - <https://api.github.com/repos/acme/paged/commits/ci103/check-runs?page=2>; rel="next"
+    status: 200 OK
+    code: 200
+- id: 22
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/paged/commits/ci103/check-runs?page=2
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"total_count":2,"check_runs":[{"id":104,"name":"test","status":"completed","conclusion":"failure"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
