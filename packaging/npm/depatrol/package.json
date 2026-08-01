@@ -1,0 +1,36 @@
+{
+  "name": "depatrol",
+  "version": "0.0.0-managed",
+  "private": true,
+  "description": "Read-only control plane for Dependabot and Renovate across repositories",
+  "keywords": [
+    "dependabot",
+    "renovate",
+    "dependencies",
+    "supply-chain",
+    "cli"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/necofuryai/depatrol.git"
+  },
+  "homepage": "https://github.com/necofuryai/depatrol#readme",
+  "bugs": "https://github.com/necofuryai/depatrol/issues",
+  "bin": {
+    "depatrol": "bin/depatrol"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@depatrol/cli-darwin-arm64": "0.0.0-managed",
+    "@depatrol/cli-darwin-x64": "0.0.0-managed",
+    "@depatrol/cli-linux-arm64": "0.0.0-managed",
+    "@depatrol/cli-linux-x64": "0.0.0-managed",
+    "@depatrol/cli-win32-x64": "0.0.0-managed"
+  }
+}

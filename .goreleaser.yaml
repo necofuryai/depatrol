@@ -1,0 +1,53 @@
+# GoReleaser OSS v2 configuration. Policy lives in ADR 0006; operational
+# detail (versions, checklist, bootstrap) in docs/runbooks/release.md.
+#
+# ldflags are intentionally left at GoReleaser defaults
+# (-s -w -X main.version/main.commit/main.date); main.go declares the
+# matching variables.
+version: 2
+
+project_name: depatrol
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+# The npm repackaging job (packaging/npm/prepare.mjs) parses these archive
+# names — keep name_template in sync with PLATFORMS there.
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+# Checksums default to sha256 in checksums.txt — required by the release
+# checklist, so the default is load-bearing.
+
+# Without this, re-running the github-release job on an already-published
+# tag fails all asset uploads with 422 — breaking the same-tag repair
+# model of ADR 0006 決定 3.
+release:
+  replace_existing_artifacts: true
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"

@@ -42,6 +42,9 @@ type Options struct {
 	Now       func() time.Time
 	Out       io.Writer
 	Err       io.Writer
+	// Version is what --version prints. main resolves it from ldflags
+	// or build info; the zero value keeps the flag working in tests.
+	Version string
 }
 
 // Run executes the CLI and returns the process exit code: 0 when a report
@@ -59,6 +62,9 @@ func Run(args []string, opts Options) int {
 	}
 	if opts.Err == nil {
 		opts.Err = os.Stderr
+	}
+	if opts.Version == "" {
+		opts.Version = "(devel)"
 	}
 
 	root := newRootCmd(opts)
@@ -83,6 +89,7 @@ func newRootCmd(opts Options) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "depatrol",
 		Short:         "Read-only control plane for dependency update bots",
+		Version:       opts.Version,
 		SilenceUsage:  true,
 		SilenceErrors: false,
 	}

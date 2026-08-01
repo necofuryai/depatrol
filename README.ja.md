@@ -22,7 +22,31 @@ depatrol は Dependabot と Renovate をリポジトリ横断で監視し、一�
 
 pre-alpha の設計フェーズ。domain model は確定している ([CONTEXT.md](CONTEXT.md) と [docs/decisions/](docs/decisions/) を参照)。実装言語は Go である (ADR 0002)。
 
-最初のマイルストーンは、read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する feasibility spike CLI。すべての判定には、`confirmed` または `inferred` の印が付いた証跡の連鎖が伴う。
+最初のマイルストーン — read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する feasibility spike CLI (すべての判定には `confirmed` または `inferred` の印が付いた証跡の連鎖が伴う) — は実装済みである ([インストール](#インストール) を参照)。
+
+## インストール
+
+すべての配布チャネルは同一の git タグから出荷される (ADR 0006)。実行時には read-only の GitHub token が `GITHUB_TOKEN` (または `GH_TOKEN`) に必要である。
+
+### npm — ツールチェーン不要
+
+```console
+npx depatrol scan --org your-org
+```
+
+`bunx depatrol` と `pnpm dlx depatrol` も同じように動く。このパッケージは `optionalDependencies` 経由でプラットフォーム別バイナリを解決し、install スクリプトを一切持たないため、`npm install --ignore-scripts` でも動作する。
+
+`npm ci` が `Cannot find module @depatrol/cli-...` で失敗する場合、古い npm が他プラットフォームの optional 依存を落とした lockfile が原因である ([npm/cli#4828](https://github.com/npm/cli/issues/4828))。`package-lock.json` と `node_modules` を削除し、`npm install` をやり直すこと。
+
+### go install
+
+```console
+go install github.com/necofuryai/depatrol@latest
+```
+
+### バイナリアーカイブ
+
+[GitHub Releases](https://github.com/necofuryai/depatrol/releases) に darwin (arm64 / amd64)、linux (amd64 / arm64)、windows (amd64) のアーカイブと sha256 checksums がある。
 
 ## ドメインモデル
 

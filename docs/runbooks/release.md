@@ -1,23 +1,61 @@
-# Release runbook (draft)
+# Release runbook
 
-ADR 0006 の運用詳細。原則は ADR 0006 が正で、本書は手順・バージョン・チェックリストのみを持つ。最小公開 (M0 合格後) の準備で完成させる。事実関係は 2026-08-01 に一次情報で検証したもの。
+ADR 0006 の運用詳細。原則は ADR 0006 が正で、本書は手順・バージョン・チェックリストのみを持つ。事実関係は 2026-08-01 に一次情報で検証し、同日の最小公開準備で本書を確定した。
 
-## パイプライン成立条件
+## パイプライン構成 (実装済み)
 
-- GoReleaser OSS v2 (検証時 v2.17.1) + goreleaser/goreleaser-action (検証時 v7.2.3)。release workflow 内のすべての action は full commit SHA に固定する (可動タグ `@v7` は使わない)。
-- actions/checkout は `fetch-depth: 0` (changelog 生成に全履歴が必要)。actions/setup-go を併用する。
+- GoReleaser OSS v2.17.1 ([release.yml](../../.github/workflows/release.yml) が `version: v2.17.1` で固定) + goreleaser/goreleaser-action。設定は [.goreleaser.yaml](../../.goreleaser.yaml)。ldflags はデフォルトのまま使い、[main.go](../../main.go) 側の変数名を合わせる。
+- release workflow 内のすべての action は full commit SHA に固定する (可動タグは使わない)。現在の固定値:
+
+  | action | tag | commit SHA |
+  |---|---|---|
+  | actions/checkout | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+  | actions/setup-go | v7.0.0 | `b7ad1dad31e06c5925ef5d2fc7ad053ef454303e` |
+  | actions/setup-node | v7.0.0 | `820762786026740c76f36085b0efc47a31fe5020` |
+  | goreleaser/goreleaser-action | v7.2.3 | `f06c13b6b1a9625abc9e6e439d9c05a8f2190e94` |
+
+- actions/checkout は `fetch-depth: 0` (changelog 生成に全履歴が必要)。
 - job 分離と権限 (ADR 0006 決定 3):
-  - build + GitHub Releases job: `contents: write`
-  - npm job: `id-token: write` + Node.js 22.14+ / npm 11.5.1+ のセットアップ
-  - tap job (第 2 波): fine-grained PAT (homebrew-tap リポジトリ限定、Contents: Read and write) を Actions secrets で管理。PAT は有効期限で静かに失効するため、失効時は再発行して同一タグで job を再実行する
-- version stamping: GoReleaser デフォルト ldflags (`-X main.version={{.Version}}` 等) に合わせて main パッケージに version / commit / date 変数を置き、未注入時は `debug.ReadBuildInfo().Main.Version` にフォールバックする。
+  - github-release job: `contents: write`
+  - npm job: `contents: read` (Releases からのダウンロード) + `id-token: write` (OIDC)。Node 24 + npm 11 を使い、publish.mjs が OIDC 最低要件の npm 11.5.1+ を assert する。
+  - tap job (第 2 波): fine-grained PAT (homebrew-tap リポジトリ限定、Contents: Read and write) を Actions secrets で管理。PAT は有効期限で静かに失効するため、失効時は再発行して同一タグで job を再実行する。
+- version stamping: GoReleaser デフォルト ldflags (`-X main.version={{.Version}}` 等) に合わせて main パッケージに version / commit / date 変数を置き、未注入時は `debug.ReadBuildInfo().Main.Version` にフォールバックする (実装済み)。
+- npm 再梱包: npm job が Releases のアーカイブを sha256 checksums 検証つきでダウンロードし、[packaging/npm/prepare.mjs](../../packaging/npm/prepare.mjs) が 6 パッケージに staging、[packaging/npm/publish.mjs](../../packaging/npm/publish.mjs) が publish する。publish は `npm view` で published 済みバージョンをスキップする冪等動作で、順序は platform → メイン。
 
 ## npm
 
-- パッケージ構成: `depatrol` (bin = Biome 式実行時解決シム: require.resolve + spawnSync、環境変数でのバイナリパス上書きを用意) + `@depatrol/cli-{darwin-arm64,darwin-x64,linux-x64,linux-arm64,win32-x64}` (各 package.json に `os` / `cpu` を宣言、バイナリのみ同梱)。optionalDependencies は同一バージョンに完全固定。publish 順は platform → メイン。
-- 初回 bootstrap: granular token で 6 パッケージを手動 publish → npmjs.com の各パッケージ設定で trusted publisher (リポジトリ + workflow ファイル名) を登録 → token を失効させる。以後は OIDC で publish (公開リポジトリなら provenance 自動付与)。package.json の `repository` フィールドは実リポジトリと大文字小文字まで厳密一致させる。
+- パッケージ構成: `depatrol` (bin = Biome 式実行時解決シム: require.resolve + spawnSync、`DEPATROL_BINARY` でのバイナリパス上書きあり) + `@depatrol/cli-{darwin-arm64,darwin-x64,linux-x64,linux-arm64,win32-x64}` (各 package.json に `os` / `cpu` を宣言、バイナリのみ同梱)。optionalDependencies は同一バージョンに完全固定。lifecycle スクリプトは使用しない。
+- `package.json` の `repository` フィールドは実リポジトリと大文字小文字まで厳密一致させる (provenance 検証の条件)。
 - CGO_ENABLED=0 のため musl 変種 (`-musl` パッケージ) は持たない。
-- 既知の落とし穴: 旧 npm が生成した lockfile から他プラットフォームの optional 依存が抜ける npm/cli#4828 (修正済みだが古い lockfile で再現しうる)。README に「`npm ci` が `Cannot find module @depatrol/...` で失敗したら lockfile を再生成」を記載する。
+- 既知の落とし穴: 旧 npm が生成した lockfile から他プラットフォームの optional 依存が抜ける npm/cli#4828 (修正済みだが古い lockfile で再現しうる)。README・npm README に「`npm ci` が `Cannot find module @depatrol/...` で失敗したら lockfile を再生成」を記載済み。シムのエラーメッセージも同じ案内を出す。
+
+### 初回 bootstrap (stub 方式)
+
+trusted publisher の登録は既存パッケージの設定画面からしか行えず、granular token による手動 publish には provenance が付かない。v0.1.0 を token で publish すると検証チェックリスト「v0.1.0 に provenance」が満たせないため、**中身のない stub バージョンで先にパッケージ名だけを作り、v0.1.0 本体は最初から OIDC で publish する**:
+
+0. 前提: npm org `depatrol` が存在すること (2026-08-01 取得済み)。scoped パッケージの publish には username か既存 org のスコープが必須で、org 名が取れない場合のフォールバックは `@necofuryai` スコープ (ADR 0006 決定 4)。フォールバック時は packaging/npm/ 内の `@depatrol` 参照 3 箇所 (メイン package.json の optionalDependencies、シムの PLATFORMS、prepare.mjs) を改名してから publish する。
+1. npmjs.com で granular token を作成する (`depatrol` と `@depatrol` スコープへの publish 権限、有効期限は最短)。`npm login` でも可。
+2. `node packaging/npm/prepare.mjs 0.0.0-bootstrap --stub`
+3. `node packaging/npm/publish.mjs packaging/npm/dist --tag bootstrap` — `--tag bootstrap` により dist-tag `latest` は汚れない。
+4. npmjs.com で 6 パッケージそれぞれの Settings → Trusted publisher に GitHub Actions (`necofuryai/depatrol` / workflow `release.yml` / environment なし) を登録する。
+5. granular token を失効させる。以後の長期 credential はゼロ。
+6. v0.1.0 の npm job を (再) 実行する → OIDC + provenance で publish される (公開リポジトリなら provenance は自動付与)。
+7. 任意: `npm deprecate depatrol@0.0.0-bootstrap "bootstrap placeholder; install latest"` (5 platform パッケージも同様)。
+
+## 最小公開手順 (v0.1.0)
+
+1. main で ci.yml が green であること。
+2. 公開前 secret スキャン: git 全履歴と `internal/cli/testdata/cassettes/` (録画時の Authorization ヘッダ) に credential が無いことを確認する。
+3. `gh repo edit necofuryai/depatrol --visibility public --accept-visibility-change-consequences`
+4. `git tag v0.1.0 && git push origin v0.1.0`
+5. github-release job の成果物 (5 アーカイブ + checksums + changelog) を確認する。
+6. npm bootstrap (上記) → 同一タグで npm job を再実行する。
+7. branch protection を設定する (required check = ci / test、PR 必須)。以後 main への直接 commit をやめ、短命ブランチ + PR に統一する (CLAUDE.md のブランチ戦略)。
+8. 検証チェックリストを消化する。
+
+チャネル公開は非原子的である (ADR 0006 決定 3)。タグ push 時点で bootstrap 未了なら npm job は失敗するが、これは想定内で、bootstrap + trusted publisher 登録後に同一タグで npm job を rerun して修復する — この rerun がチェックリスト最終項目 (冪等修復) の実地検証を兼ねる。
+
+再実行の冪等性は `.goreleaser.yaml` の `release.replace_existing_artifacts: true` が支える (未設定だと公開済みリリースへの asset 再アップロードが 422 で恒久失敗し、npm job も `needs` 経由でスキップされる)。github-release job がアップロード途中で失敗した場合は未公開 draft が Releases に残ることがあるので、削除してから再実行する。
 
 ## Homebrew (第 2 波、トリガー到達後)
 

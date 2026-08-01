@@ -1,0 +1,58 @@
+# Tag push is the only release trigger (ADR 0006: タグが release ID).
+# Jobs are split per channel so permissions stay minimal and a partial
+# failure is repaired by re-running the failed job on the same tag.
+# Every action is pinned to a full commit SHA (docs/runbooks/release.md).
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history for changelog generation
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.17.1
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm:
+    needs: github-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # gh release download
+      id-token: write # OIDC trusted publishing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      # publish.mjs asserts npm >= 11.5.1 (OIDC minimum, runbook).
+      - run: npm install -g npm@11
+      - name: Download and verify release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --dir artifacts \
+            --pattern '*.tar.gz' --pattern '*.zip' --pattern '*checksums.txt'
+          cd artifacts
+          sha256sum --check --ignore-missing ./*checksums.txt
+      - name: Repackage archives into npm packages
+        run: node packaging/npm/prepare.mjs "${GITHUB_REF_NAME#v}" artifacts
+      - name: Publish (idempotent, platform packages before main)
+        run: node packaging/npm/publish.mjs packaging/npm/dist

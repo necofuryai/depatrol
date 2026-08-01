@@ -1,0 +1,59 @@
+#!/usr/bin/env node
+"use strict";
+
+// Runtime resolution shim (ADR 0006 決定 4, Biome 式): the platform
+// binary ships in an optionalDependency and is resolved here at run
+// time. No lifecycle scripts — installs must survive --ignore-scripts,
+// pnpm's script blocking, and bun's default-secure mode.
+
+const { spawnSync } = require("node:child_process");
+
+const PLATFORMS = {
+  "darwin-arm64": "@depatrol/cli-darwin-arm64",
+  "darwin-x64": "@depatrol/cli-darwin-x64",
+  "linux-arm64": "@depatrol/cli-linux-arm64",
+  "linux-x64": "@depatrol/cli-linux-x64",
+  "win32-x64": "@depatrol/cli-win32-x64",
+};
+
+function fail(message) {
+  console.error(`depatrol: ${message}`);
+  process.exit(1);
+}
+
+function resolveBinary() {
+  const override = process.env.DEPATROL_BINARY;
+  if (override) {
+    return override;
+  }
+  const key = `${process.platform}-${process.arch}`;
+  const pkg = PLATFORMS[key];
+  if (!pkg) {
+    fail(
+      `unsupported platform ${key}; use GitHub Releases or go install instead ` +
+        "(https://github.com/necofuryai/depatrol#installation)",
+    );
+  }
+  const binary = process.platform === "win32" ? "depatrol.exe" : "depatrol";
+  try {
+    return require.resolve(`${pkg}/${binary}`);
+  } catch {
+    fail(
+      `${pkg} is missing. Lockfiles written by old npm can drop other ` +
+        "platforms' optional dependencies (npm/cli#4828) — delete " +
+        "package-lock.json and node_modules, then reinstall. " +
+        "DEPATROL_BINARY=/path/to/depatrol overrides resolution.",
+    );
+  }
+}
+
+const result = spawnSync(resolveBinary(), process.argv.slice(2), {
+  stdio: "inherit",
+});
+if (result.error) {
+  fail(result.error.message);
+}
+if (result.signal) {
+  process.kill(process.pid, result.signal);
+}
+process.exit(result.status ?? 1);

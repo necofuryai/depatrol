@@ -22,7 +22,31 @@ Existing tools tell you a bot is *configured* (OpenSSF Scorecard, Evergreen) or 
 
 Pre-alpha, design phase. The domain model is settled (see [CONTEXT.md](CONTEXT.md) and [docs/decisions/](docs/decisions/)); the implementation language is Go (ADR 0002).
 
-First milestone: a feasibility-spike CLI that scans repositories with read-only GitHub credentials and reports the conditions below, every judgment carrying its evidence chain marked `confirmed` or `inferred`.
+The first milestone — a feasibility-spike CLI that scans repositories with read-only GitHub credentials and reports the conditions below, every judgment carrying its evidence chain marked `confirmed` or `inferred` — is implemented; see [Installation](#installation).
+
+## Installation
+
+Every distribution channel ships from the same git tag (ADR 0006). At run time the CLI needs a read-only GitHub token in `GITHUB_TOKEN` (or `GH_TOKEN`).
+
+### npm — no toolchain required
+
+```console
+npx depatrol scan --org your-org
+```
+
+`bunx depatrol` and `pnpm dlx depatrol` work the same way. The package resolves a platform-specific binary through `optionalDependencies` and has no install scripts, so `npm install --ignore-scripts` also works.
+
+If `npm ci` fails with `Cannot find module @depatrol/cli-...`, the lockfile was written by an older npm that dropped other platforms' optional dependencies ([npm/cli#4828](https://github.com/npm/cli/issues/4828)). Delete `package-lock.json` and `node_modules`, then run `npm install` again.
+
+### go install
+
+```console
+go install github.com/necofuryai/depatrol@latest
+```
+
+### Binary archives
+
+[GitHub Releases](https://github.com/necofuryai/depatrol/releases) carries archives for darwin (arm64 / amd64), linux (amd64 / arm64), and windows (amd64), each release with sha256 checksums.
 
 ## Domain model
 
