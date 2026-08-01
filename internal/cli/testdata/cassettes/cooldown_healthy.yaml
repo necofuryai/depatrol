@@ -1,0 +1,187 @@
+---
+version: 2
+interactions:
+- id: 0
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"id":9,"name":"cooldown","full_name":"acme/cooldown","owner":{"login":"acme"},"default_branch":"main","archived":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 1
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown/git/trees/main?recursive=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"sha":"3c4d5e","tree":[{"path":"package.json","type":"blob"},{"path":".github/dependabot.yml","type":"blob"}],"truncated":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 2
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown/contents/.github/dependabot.yml?ref=main
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"type":"file","encoding":"base64","name":"dependabot.yml","path":".github/dependabot.yml","content":"dmVyc2lvbjogMgp1cGRhdGVzOgogIC0gcGFja2FnZS1lY29zeXN0ZW06ICJucG0iCiAgICBkaXJlY3Rvcnk6ICIvIgogICAgc2NoZWR1bGU6CiAgICAgIGludGVydmFsOiAid2Vla2x5IgogICAgY29vbGRvd246CiAgICAgIGRlZmF1bHQtZGF5czogMTQK"}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 3
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown/automated-security-fixes
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"enabled":true,"paused":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 4
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown/dependabot/alerts?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 5
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown/dependabot/alerts?per_page=100&state=fixed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 6
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown/pulls?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 7
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/cooldown/pulls?per_page=100&state=closed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":7,"state":"closed","title":"Bump lodash from 1.0.0 to 1.0.1","user":{"login":"dependabot[bot]"},"created_at":"2026-07-14T12:00:00Z","merged_at":"2026-07-15T09:00:00Z","head":{"ref":"dependabot/npm_and_yarn/lodash-1.0.1","sha":"aa11"},"base":{"ref":"main"}},{"number":8,"state":"closed","title":"Add feature","user":{"login":"alice"},"created_at":"2026-07-30T12:00:00Z","merged_at":"2026-07-30T15:00:00Z","head":{"ref":"feature","sha":"bb22"},"base":{"ref":"main"}}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200

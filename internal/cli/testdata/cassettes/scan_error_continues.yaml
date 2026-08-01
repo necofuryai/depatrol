@@ -1,0 +1,210 @@
+---
+version: 2
+interactions:
+- id: 0
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/broken
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"message":"Internal Server Error"}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 500 Internal Server Error
+    code: 500
+- id: 1
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"id":1,"name":"empty","full_name":"acme/empty","owner":{"login":"acme"},"default_branch":"main","archived":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 2
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/git/trees/main?recursive=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"sha":"0a1b2c","tree":[],"truncated":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 3
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/contents/.github/dependabot.yml?ref=main
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"message":"Not Found"}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 404 Not Found
+    code: 404
+- id: 4
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/automated-security-fixes
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"enabled":true,"paused":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 5
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/dependabot/alerts?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 6
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/dependabot/alerts?per_page=100&state=fixed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 7
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/pulls?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 8
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/empty/pulls?per_page=100&state=closed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200

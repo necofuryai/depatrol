@@ -1,0 +1,187 @@
+---
+version: 2
+interactions:
+- id: 0
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"id":9,"name":"nofix","full_name":"acme/nofix","owner":{"login":"acme"},"default_branch":"main","archived":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 1
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix/git/trees/main?recursive=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"sha":"3c4d5e","tree":[{"path":"package.json","type":"blob"},{"path":".github/dependabot.yml","type":"blob"}],"truncated":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 2
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix/contents/.github/dependabot.yml?ref=main
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"type":"file","encoding":"base64","name":"dependabot.yml","path":".github/dependabot.yml","content":"dmVyc2lvbjogMgp1cGRhdGVzOgogIC0gcGFja2FnZS1lY29zeXN0ZW06ICJucG0iCiAgICBkaXJlY3Rvcnk6ICIvIgogICAgc2NoZWR1bGU6CiAgICAgIGludGVydmFsOiAid2Vla2x5Igo="}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 3
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix/automated-security-fixes
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"enabled":true,"paused":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 4
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix/dependabot/alerts?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":13,"state":"open","dependency":{"package":{"ecosystem":"npm","name":"leftover"},"manifest_path":"package.json","scope":"runtime"},"security_advisory":{"ghsa_id":"GHSA-dddd-eeee-ffff","severity":"critical","summary":"RCE with no released fix"},"security_vulnerability":{"package":{"ecosystem":"npm","name":"leftover"},"severity":"critical","vulnerable_version_range":"<= 2.0.0","first_patched_version":null},"created_at":"2026-07-01T00:00:00Z","updated_at":"2026-07-01T00:00:00Z","html_url":"https://github.com/acme/nofix/security/dependabot/13"}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 5
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix/dependabot/alerts?per_page=100&state=fixed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 6
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix/pulls?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 7
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/nofix/pulls?per_page=100&state=closed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[{"number":50,"state":"closed","title":"Bump left-pad from 1.0.0 to 1.0.1","user":{"login":"dependabot[bot]"},"created_at":"2026-07-30T09:00:00Z","merged_at":"2026-07-30T10:00:00Z","head":{"ref":"dependabot/npm_and_yarn/left-pad-1.0.1","sha":"dd44"},"base":{"ref":"main"}}]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200

@@ -1,0 +1,187 @@
+---
+version: 2
+interactions:
+- id: 0
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"id":2,"name":"gap","full_name":"acme/gap","owner":{"login":"acme"},"default_branch":"main","archived":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 1
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap/git/trees/main?recursive=1
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"sha":"1a2b3c","tree":[{"path":"README.md","type":"blob"},{"path":"package.json","type":"blob"}],"truncated":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 2
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap/contents/.github/dependabot.yml?ref=main
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/contents#get-repository-content"}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 404 Not Found
+    code: 404
+- id: 3
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap/automated-security-fixes
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '{"enabled":true,"paused":false}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 4
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap/dependabot/alerts?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 5
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap/dependabot/alerts?per_page=100&state=fixed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 6
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap/pulls?per_page=100&state=open
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
+- id: 7
+  request:
+    proto: HTTP/1.1
+    proto_major: 1
+    proto_minor: 1
+    content_length: 0
+    host: api.github.com
+    body: ""
+    headers: {}
+    url: https://api.github.com/repos/acme/gap/pulls?per_page=100&state=closed
+    method: GET
+  response:
+    proto: HTTP/2.0
+    proto_major: 2
+    proto_minor: 0
+    content_length: -1
+    uncompressed: true
+    body: '[]'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status: 200 OK
+    code: 200
