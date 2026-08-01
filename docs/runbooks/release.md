@@ -34,7 +34,7 @@ ADR 0006 の運用詳細。原則は ADR 0006 が正で、本書は手順・バ�
 trusted publisher の登録は既存パッケージの設定画面からしか行えず、granular token による手動 publish には provenance が付かない。v0.1.0 を token で publish すると検証チェックリスト「v0.1.0 に provenance」が満たせないため、**中身のない stub バージョンで先にパッケージ名だけを作り、v0.1.0 本体は最初から OIDC で publish する**:
 
 0. 前提: npm org `depatrol` が存在すること (2026-08-01 取得済み)。scoped パッケージの publish には username か既存 org のスコープが必須で、org 名が取れない場合のフォールバックは `@necofuryai` スコープ (ADR 0006 決定 4)。フォールバック時は packaging/npm/ 内の `@depatrol` 参照 3 箇所 (メイン package.json の optionalDependencies、シムの PLATFORMS、prepare.mjs) を改名してから publish する。
-1. npmjs.com で granular token を作成する (`depatrol` と `@depatrol` スコープへの publish 権限、有効期限は最短)。`npm login` でも可。
+1. npmjs.com で granular token を作成する: Packages and scopes は **Read and write / All packages** (未作成の unscoped `depatrol` は個別指定できない)、**Bypass two-factor authentication を有効化**、有効期限は最短。アカウントの publishing access は既定で「2FA または bypass 付き granular token」を要求するため、bypass 無しの token は publish 時に E403 になる (2026-08-01 実地確認)。`npm login` セッションは publish 時に 2FA の対話を要するため token 方式を推奨。
 2. `node packaging/npm/prepare.mjs 0.0.0-bootstrap --stub`
 3. `node packaging/npm/publish.mjs packaging/npm/dist --tag bootstrap` — `--tag bootstrap` により dist-tag `latest` は汚れない。
 4. npmjs.com で 6 パッケージそれぞれの Settings → Trusted publisher に GitHub Actions (`necofuryai/depatrol` / workflow `release.yml` / environment なし) を登録する。
