@@ -87,6 +87,10 @@ depatrol は二層のモデルを使う:
 
 このプロジェクトは、市場と競合の調査 (2026-08) を出発点とする。全文は [docs/research/2026-08-01-market-research.md](docs/research/2026-08-01-market-research.md) にある。
 
+## コントリビューション
+
+Issue フォーム、PR チェックリスト、ワークフロー全体 (trunk-based ブランチ、コミット規約、DCO) は [CONTRIBUTING.md](CONTRIBUTING.md) にある。脆弱性の報告は public な Issue ではなく、リポジトリの Security タブから private に行うこと。
+
 ## ライセンス
 
 Apache-2.0。コントリビューションには DCO の sign-off (`git commit -s`) が必要である。
