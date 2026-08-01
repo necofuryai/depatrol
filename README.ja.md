@@ -29,13 +29,13 @@ pre-alpha の設計フェーズ。domain model は確定している ([CONTEXT.m
 depatrol は二層のモデルを使う:
 
 - **Finding (所見)**: 対象 (manifest、bot 設定、例外レコード) に付く、検証された観測。一つのリポジトリに複数の Finding が共存し、排他的な状態ではない。
-- **ExpectedUpdate (期待更新) のライフサイクル**: 起きるべき更新の一つひとつを *ExpectedUpdate* (同一性は repository × manifest × dependency の組) として追跡し、PR がまだ存在するかどうかに関係なく、`pending → update_open → blocked ⇄ …` を経て `effective` または `merged_not_effective` に至るまで追う。PR や alert はこの entity に紐づく証跡であって entity 本体ではないため、PR の作り直しや grouped PR があっても追跡は途切れない。
+- **ExpectedUpdate (期待更新) のライフサイクル**: 起きるべき更新の一つひとつを *ExpectedUpdate* (同一性は repository × manifest × dependency の組) として追跡し、PR がまだ存在するかどうかに関係なく、`pending → update_open → blocked ⇄ …` を経て、現在の default branch 上で `effective` と確認されるか、追跡が無意味になり `superseded` で終わるまで追う (merge 済みでも有効になっていなければ、`merged_not_effective` として追跡が続く)。PR や alert はこの entity に紐づく証跡であって entity 本体ではないため、PR の作り直しや grouped PR があっても追跡は途切れない。
 - **Evidence (証跡)**: すべての判定は、根拠となった観測を引用する。各観測は `confirmed` (直接観測) か `inferred` (推定) のいずれかで、判定が `confirmed` になるのは、判定を支える観測のすべてが `confirmed` であるときに限る (最弱リンク則)。
 
 製品の輪郭は、次の二つの線引きが定める:
 
 - **depatrol は version 解決を自分では行わない** (ADR 0003)。検証するのは、bot が約束したことを実行しているかであって、可能なことをすべて約束したかではない。
-- **depatrol はどこにも書き込まない** (ADR 0004)。policy、owner マッピング、例外は、組織自身の統治リポジトリに置く宣言的 YAML である。例外の承認は pull request の review であり、監査証跡は git の履歴である。
+- **depatrol はどこにも書き込まない** (ADR 0004)。policy、owner マッピング、例外は、組織自身の統治リポジトリに置く宣言的 YAML である。例外の承認は pull request の merge であり、監査証跡は git の履歴である。
 
 ## リポジトリ rollup の語彙
 
@@ -52,7 +52,7 @@ depatrol は二層のモデルを使う:
 | `coverage_gap` | bot 設定も security feature も無い manifest がある |
 | `policy_drift` | schedule、group、target branch が組織 policy から逸脱している |
 | `update_open` | 更新 PR が処理待ち |
-| `pending` | 更新が利用可能と判明しているが、bot がまだ PR を作っていない (schedule / cooldown の範囲内なら正常) |
+| `pending` | 更新は利用可能だが、まだ現在の default branch 上で有効になっていない。bot の PR 作成前と、merge 後に再評価で有効性が確定するまでの猶予の両方を含む (schedule / cooldown の範囲内なら正常) |
 | `healthy` | Finding も未解決の ExpectedUpdate も無い (導出値) |
 
 承認済みの例外が付いた条件は rollup から抑止される (記録には残る)。すべての条件が抑止されたリポジトリには `exception_active` が表示される。

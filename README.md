@@ -29,13 +29,13 @@ First milestone: a feasibility-spike CLI that scans repositories with read-only 
 depatrol uses a two-layer model:
 
 - **Findings** — verified observations attached to a subject (a manifest, a bot config, an exception record). Multiple findings coexist per repository; they are not exclusive states.
-- **ExpectedUpdate lifecycle** — every update that should happen is tracked as an *ExpectedUpdate* (identity: repository × manifest × dependency) moving through `pending → update_open → blocked ⇄ …` until `effective` or `merged_not_effective`, regardless of whether a PR exists yet. PRs and alerts are evidence linked to the entity, not the entity itself, so tracking survives PR recreation and grouped PRs.
+- **ExpectedUpdate lifecycle** — every update that should happen is tracked as an *ExpectedUpdate* (identity: repository × manifest × dependency) moving through `pending → update_open → blocked ⇄ …` until it is confirmed `effective` on the current default branch or retired as `superseded`, regardless of whether a PR exists yet; a merged-but-ineffective fix stays tracked as `merged_not_effective`. PRs and alerts are evidence linked to the entity, not the entity itself, so tracking survives PR recreation and grouped PRs.
 - **Evidence** — every judgment cites the observations behind it. Each observation is `confirmed` (directly observed) or `inferred` (estimated); a judgment is only `confirmed` if every load-bearing observation is (weakest-link rule).
 
 Two boundary decisions define the product:
 
 - **depatrol never resolves versions itself** (ADR 0003). It verifies that your bots do what they promise — not that they promised everything possible.
-- **depatrol never writes anywhere** (ADR 0004). Policy, owner mapping, and exceptions are declarative YAML in your own governance repository; approving an exception is a pull request review, and the audit trail is git history.
+- **depatrol never writes anywhere** (ADR 0004). Policy, owner mapping, and exceptions are declarative YAML in your own governance repository; approving an exception is a pull request merge, and the audit trail is git history.
 
 ## Repository rollup vocabulary
 
@@ -52,7 +52,7 @@ In cross-repository views, each repository is labeled with the most severe condi
 | `coverage_gap` | Manifest without bot config or security feature |
 | `policy_drift` | Schedule, groups, or target branch deviate from org policy |
 | `update_open` | Update PR awaiting processing |
-| `pending` | Update known to be available; bot has not created a PR yet (normal within schedule/cooldown) |
+| `pending` | Update known to be available but not yet effective on the default branch — before the bot creates a PR, or in the post-merge grace period until re-evaluation confirms the fix (normal within schedule/cooldown) |
 | `healthy` | No findings, no unresolved ExpectedUpdates (derived) |
 
 A condition covered by an approved exception is suppressed from the rollup (but stays recorded); a repository whose every condition is suppressed shows `exception_active`.
