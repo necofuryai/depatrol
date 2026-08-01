@@ -6,3 +6,4 @@ depatrol: Dependabot / Renovate をリポジトリ横断で監視する read-onl
 - 決定記録は docs/decisions/ (ADR 形式)。ライセンスは Apache-2.0 + DCO で採択済み (0001)。実装言語は Go (0002 で採択済み)。M0 完了時に苦痛点を 0002 に追記し、M1 着手前を再考ゲートとする。
 - ROADMAP.md はドラフト。grilling と spec 化で精査してから確定する。
 - コミットメッセージと PR タイトルは英語 (`<type>: <description>` 形式)。
+- ブランチ戦略は trunk-based。main を唯一の長命ブランチとし、公開前の現フェーズは main への直接 commit を許容する。最小公開 (M0 合格後) の時点で branch protection を設定し、以後は短命ブランチ (`<type>/<topic>`) からの PR 経由に統一する。
