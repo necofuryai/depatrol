@@ -20,9 +20,9 @@ Existing tools tell you a bot is *configured* (OpenSSF Scorecard, Evergreen) or 
 
 ## Status
 
-Pre-alpha, design phase. The domain model is settled (see [CONTEXT.md](CONTEXT.md) and [docs/decisions/](docs/decisions/)); the implementation language is Go (ADR 0002).
+Pre-alpha. The first milestone — a feasibility-spike CLI that scans repositories with read-only GitHub credentials and reports the conditions below, every judgment carrying its evidence chain marked `confirmed` or `inferred` — is released as **v0.1.0**; see [Installation](#installation).
 
-The first milestone — a feasibility-spike CLI that scans repositories with read-only GitHub credentials and reports the conditions below, every judgment carrying its evidence chain marked `confirmed` or `inferred` — is implemented; see [Installation](#installation).
+Scope today is Dependabot on GitHub. Renovate (M1), default-branch re-verification of version updates (M2), and the governance engine — policy, owners, exceptions, SLA (M3) — are not implemented yet; [ROADMAP.md](ROADMAP.md) says what each milestone adds. The domain model is settled (see [CONTEXT.md](CONTEXT.md) and [docs/decisions/](docs/decisions/)); the implementation language is Go (ADR 0002).
 
 ## Installation
 
@@ -80,6 +80,8 @@ In cross-repository views, each repository is labeled with the most severe condi
 | `healthy` | No findings, no unresolved ExpectedUpdates (derived) |
 
 A condition covered by an approved exception is suppressed from the rollup (but stays recorded); a repository whose every condition is suppressed shows `exception_active`.
+
+This table is the full vocabulary, not the current output: `policy_drift`, `sla_breached`, and `exception_active` depend on the governance engine (M3) and are not emitted by v0.1.0.
 
 ## Background
 

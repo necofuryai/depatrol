@@ -20,9 +20,9 @@ depatrol は Dependabot と Renovate をリポジトリ横断で監視し、一�
 
 ## ステータス
 
-pre-alpha の設計フェーズ。domain model は確定している ([CONTEXT.md](CONTEXT.md) と [docs/decisions/](docs/decisions/) を参照)。実装言語は Go である (ADR 0002)。
+pre-alpha。最初のマイルストーン — read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する feasibility spike CLI (すべての判定には `confirmed` または `inferred` の印が付いた証跡の連鎖が伴う) — は **v0.1.0** として公開済みである ([インストール](#インストール) を参照)。
 
-最初のマイルストーン — read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する feasibility spike CLI (すべての判定には `confirmed` または `inferred` の印が付いた証跡の連鎖が伴う) — は実装済みである ([インストール](#インストール) を参照)。
+現時点の対象は GitHub 上の Dependabot である。Renovate (M1)、version update の default branch 再検証 (M2)、統治エンジン — policy、owner、例外、SLA (M3) — は未実装である。各マイルストーンで何が加わるかは [ROADMAP.md](ROADMAP.md) にある。domain model は確定している ([CONTEXT.md](CONTEXT.md) と [docs/decisions/](docs/decisions/) を参照)。実装言語は Go である (ADR 0002)。
 
 ## インストール
 
@@ -80,6 +80,8 @@ depatrol は二層のモデルを使う:
 | `healthy` | Finding も未解決の ExpectedUpdate も無い (導出値) |
 
 承認済みの例外が付いた条件は rollup から抑止される (記録には残る)。すべての条件が抑止されたリポジトリには `exception_active` が表示される。
+
+この表は語彙の全体であって、現在の出力ではない。`policy_drift`、`sla_breached`、`exception_active` は統治エンジン (M3) を前提とするため、v0.1.0 では出力されない。
 
 ## 背景
 
