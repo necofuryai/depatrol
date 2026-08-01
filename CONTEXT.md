@@ -60,7 +60,7 @@ _Avoid_: 期限や owner の無い恒久 mute。
 ### ライフサイクル状態 (ExpectedUpdate の遷移位置)
 
 **pending**:
-更新は利用可能だが、bot がまだ PR を作っていない期間。schedule や cooldown の範囲内なら正常。
+更新は利用可能だが、まだ現 default branch 上で有効になっていない待ちの期間。bot が PR を作る前と、PR の merge 後に GitHub の再評価で有効性が確定するまでの猶予期間の両方を含む。schedule や cooldown の範囲内なら正常。
 
 **update_open**:
 ExpectedUpdate に対応する PR が存在し、正常に処理待ち。
