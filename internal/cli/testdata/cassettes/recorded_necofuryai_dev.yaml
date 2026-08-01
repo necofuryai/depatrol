@@ -49,24 +49,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - repo
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; param=scarlet-witch-preview; format=json, github.mercy-preview; param=baptiste-preview.nebula-preview; format=json
-            X-Github-Request-Id:
-                - E535:304448:68F629:7A2FE7:6A6D7995
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -133,24 +123,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - ""
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68F6B4:7A3096:6A6D7996
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -218,24 +198,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP, Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - repo
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68F7DA:7A31D1:6A6D7997
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -297,24 +267,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - repo
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68F870:7A326F:6A6D7998
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -382,24 +342,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - admin:repo_hook, delete_repo, read:repo_hook, repo, repo:invite, repo:status, repo_deployment, security_events, write:repo_hook
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68F8ED:7A3304:6A6D7999
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -468,24 +418,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - admin:repo_hook, delete_repo, read:repo_hook, repo, repo:invite, repo:status, repo_deployment, security_events, write:repo_hook
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68F973:7A3398:6A6D7999
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -553,24 +493,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - ""
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68FA89:7A34E8:6A6D799A
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -638,24 +568,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - ""
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68FB29:7A3588:6A6D799B
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
@@ -722,24 +642,14 @@ interactions:
                 - max-age=31536000; includeSubdomains; preload
             Vary:
                 - Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With
-            X-Accepted-Oauth-Scopes:
-                - ""
             X-Content-Type-Options:
                 - nosniff
             X-Frame-Options:
                 - deny
             X-Github-Api-Version-Selected:
                 - "2022-11-28"
-            X-Github-Edge-Region:
-                - japaneast
             X-Github-Media-Type:
                 - github.v3; format=json
-            X-Github-Request-Id:
-                - E535:304448:68FBBC:7A363B:6A6D799C
-            X-Oauth-Client-Id:
-                - 178c6fc778ccc68e1d6a
-            X-Oauth-Scopes:
-                - gist, read:org, repo, workflow
             X-Ratelimit-Limit:
                 - "5000"
             X-Ratelimit-Remaining:
