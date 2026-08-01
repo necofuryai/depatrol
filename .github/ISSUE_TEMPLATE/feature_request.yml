@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose a new capability or an improvement to an existing one.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [ROADMAP.md](https://github.com/necofuryai/depatrol/blob/main/ROADMAP.md) first — Renovate support (M1), default-branch re-verification (M2), and the governance engine (M3) are already planned.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to accomplish, and what stops you today? Describe the situation, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you imagine depatrol addressing it. Rough is fine — the problem statement matters more.
+    validations:
+      required: false
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Product boundaries
+      description: >-
+        depatrol has two decided boundaries: it never resolves versions itself
+        ([ADR 0003](https://github.com/necofuryai/depatrol/blob/main/docs/decisions/0003-no-version-resolution.md))
+        and it never writes anywhere — read-only credentials only
+        ([ADR 0004](https://github.com/necofuryai/depatrol/blob/main/docs/decisions/0004-governance-as-code.md)).
+      options:
+        - label: This request does not require depatrol to resolve dependency versions itself, and does not require write access to any repository.
+          required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing tools or workarounds you tried, and why they fall short.
+    validations:
+      required: false

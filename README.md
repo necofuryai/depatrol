@@ -87,6 +87,10 @@ This table is the full vocabulary, not the current output: `policy_drift`, `sla_
 
 Founded on a market and competitive study (2026-08): [docs/research/2026-08-01-market-research.md](docs/research/2026-08-01-market-research.md) (Japanese).
 
+## Contributing
+
+Issue forms, the pull request checklist, and the full workflow — trunk-based branches, commit format, DCO — are in [CONTRIBUTING.md](CONTRIBUTING.md). Report security vulnerabilities privately via the repository Security tab, never as public issues.
+
 ## License
 
 Apache-2.0. Contributions require a DCO sign-off (`git commit -s`).
