@@ -1,34 +1,45 @@
-# ロードマップ (ドラフト)
+# ロードマップ
 
-このロードマップは設立調査 (docs/research/) から導いた草案であり、grilling と spec 化の過程で書き直す前提である。
+設立調査 (docs/research/) と 2026-08-01 の grilling から導出。domain model は CONTEXT.md、決定記録は docs/decisions/ を参照。
 
-## M0: feasibility spike CLI
+## M0: feasibility spike CLI (Dependabot、PAT、read-only)
 
-- read-only 資格情報 (PAT) で複数リポジトリを走査し、11 状態モデルに分類して表 / JSON で出力する。
-- 調査の No-go 条件「Dependabot の run evidence を十分な精度で取得できない」をここで実証または棄却する。
-- run evidence が API で取れない場合は、config schedule、cooldown、paused state、Pull Request activity からの推定にフォールバックし、出力で `confirmed` と `inferred` を区別する。
-- 停滞判定は schedule の額面ではなく cooldown とグループ設定を解釈する (額面だけで判定すると正常なリポジトリを停滞と誤判定する)。
+- 対象条件: `coverage_gap`、`paused_or_stalled`、`pending` (advisory 参照付きのみ — ADR 0003 の非対称)、`update_open`、`blocked`、`fix_unavailable`、`vulnerable_unpatched` (導出)、および advisory 参照付きの `effective` / `merged_not_effective` (GitHub の alert 自動 resolve を default branch 再評価の証跡として利用)。
+- すべての判定は Evidence 連鎖と confirmed / inferred を伴って表 / JSON で出力する。
+- 除外: `policy_drift`・`sla_breached`・`exception_active` (統治オブジェクトが必要 → M3)、version update の `effective` / `merged_not_effective` (再走査が必要 → M2)、Renovate (→ M1)。
+- stateless なスナップショット実行。DB は持たない (first_observed は alert の `created_at` で代用可能なため)。
+- 合否基準 (調査の技術的 No-go 条件の運用形):
+  1. すべての `paused_or_stalled` 判定が、人間の監査者が受け入れられる完全な Evidence 連鎖 (schedule + cooldown + activity) を提示できること。
+  2. 既知の健全リポジトリ群に対する stalled の誤検出ゼロ (cooldown 解釈込み)。
+  3. 停止系は実環境での再現が困難なため、記録済み API fixture で検証すること。
 
-## M1: bot 中立の状態モデル v1
+## M1: Renovate adapter + bot 中立モデル v1
 
-- Renovate adapter を追加する。bot の識別は GitHub App ID、login、label、branch prefix を設定可能にする (self-hosted Renovate は login を変えられるため)。
-- Dependabot adapter と統一した状態モデルで出力する。
+- bot 識別は GitHub App ID、login、label、branch prefix を設定可能にする (self-hosted Renovate は login を変えられるため)。
+- Dependency Dashboard issue の解析により Renovate の `pending` を可観測にする。
+- 両 bot を同一の ExpectedUpdate / Finding モデルで出力する。
 
-## M2: default branch 到達検証
+## M2: default branch 到達検証の一般化
 
-- merge commit の祖先判定と、現 default branch の manifest / lockfile 再走査 (OSV-Scanner または dependency-management-data との連携) を照合する。
-- `merged_not_effective` (merge 済みだが現 default branch では修正が有効でない) を検出する。
+- version update への拡張: 現 default branch の manifest / lockfile 再走査 (OSV-Scanner または dependency-management-data 連携) と merge commit 祖先判定の照合。
+- GitHub 以外の advisory ソース (scanner adapter — ADR 0003 の第三系統) の導入。
 
-## M3: SLA / policy エンジン
+## M3: 統治エンジン
 
-- severity、EPSS、patch availability、dependency scope、repository criticality による SLA 判定。
-- owner と例外 (期限付き) のモデル。JSON と Prometheus metrics の出力。
+- 統治リポジトリ (YAML) の読み込み: policy、owner マッピング、例外 (ADR 0004)。
+- `policy_drift`、`sla_breached`、抑止付き rollup、期限切れ例外の検出。
+- 観測キャッシュ DB の導入 (「人間の意思決定は git、機械の観測は DB」)。
+- JSON と Prometheus metrics の出力。
 
 ## M4: パッケージング
 
-- read-only GitHub App 化と最小 Web UI。
+- read-only GitHub App 化と閲覧専用 Web UI (ADR 0004 により統治オブジェクトの編集機能は持たない)。
 
-## 並走: 需要検証
+## 並走: 検証 (個人開発版)
 
-- Platform Engineering、AppSec、OSPO への 10 から 15 人のインタビュー (質問リストは設立調査を参照)。
-- 3 組織以上が集まれば 4 週間の read-only pilot を行い、Go / Pivot / No-go を判定する。
+事前 interview と組織 pilot は個人開発では実行困難なため、「最小公開 → シグナル観測」に置き換える (2026-08-01 grilling で決定)。
+
+- **技術関門の維持**: M0 の合否基準で落ちたら No-go。
+- **dogfooding を一次検証にする**: 自リポジトリ群で M0 から常用し、pilot 測定項目 (`coverage_gap`、`paused_or_stalled`、`blocked`、`merged_not_effective` の検出数と修正数) を n=1 で記録する。
+- **公開シグナル観測**: M0 動作後に公開し、既存の要望スレッド (dependabot-core issue #2936、renovate discussion #25906) で報告。issue、討論、実利用報告を需要シグナルとして観測する。
+- **撤退基準の維持**: 価値が単一領域 (config drift のみ、PR 処理のみ等) に集中する徴候が出たら、新製品を続けず既存 OSS (gh-dep、repo-guardian、DefectDojo など) への contribution に切り替える。
