@@ -11,6 +11,11 @@ project_name: depatrol
 builds:
   - env:
       - CGO_ENABLED=0
+    # Without -trimpath the binary embeds the builder's absolute paths —
+    # toolchain, module cache, and the source tree that panic traces cite.
+    # It also completes reproducibility alongside mod_timestamp below.
+    flags:
+      - -trimpath
     goos:
       - darwin
       - linux
