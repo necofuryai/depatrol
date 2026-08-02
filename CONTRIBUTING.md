@@ -18,7 +18,7 @@ depatrol is **pre-alpha**. The domain model is settled ([CONTEXT.md](CONTEXT.md)
 
 Maintainers triage every issue. Most labels are GitHub defaults; one is project-specific:
 
-- `ready-for-agent` — the issue carries a complete spec (acceptance criteria and blocking edges) and can be picked up for implementation without further discussion. Maintainers apply it; contributors don't need to.
+- `ready-for-implementation` — the issue carries a complete spec (acceptance criteria and blocking edges) and can be picked up for implementation without further discussion. Maintainers apply it; contributors don't need to.
 
 ## Proposing changes
 

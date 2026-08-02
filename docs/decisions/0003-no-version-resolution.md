@@ -5,7 +5,7 @@
 
 ## 背景
 
-domain model の grilling (2026-08-01) で、ライフサイクル追跡の entity を ExpectedUpdate (同一性: repository × manifest × dependency) と定めた。次の問いは「depatrol は『更新が利用可能である』という事実をどう知るか」だった。
+domain model の設計レビュー (2026-08-01) で、ライフサイクル追跡の entity を ExpectedUpdate (同一性: repository × manifest × dependency) と定めた。次の問いは「depatrol は『更新が利用可能である』という事実をどう知るか」だった。
 
 registry を自前で照会して version 解決を行えば「bot が見落とした更新」も検出できるが、それは ecosystem ごとの解決実装 (npm、pip、cargo、Maven...) を意味し、Renovate のコア機能の再実装になる。設立調査 (docs/research/2026-08-01-market-research.md) は「新しい更新 bot」を作る方向を明確に退けている。
 

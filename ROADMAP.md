@@ -1,6 +1,6 @@
 # ロードマップ
 
-設立調査 (docs/research/) と 2026-08-01 の grilling から導出。domain model は CONTEXT.md、決定記録は docs/decisions/ を参照。
+設立調査 (docs/research/) と 2026-08-01 の設計レビューから導出。domain model は CONTEXT.md、決定記録は docs/decisions/ を参照。
 
 ## M0: feasibility spike CLI (Dependabot、PAT、read-only)
 
@@ -47,7 +47,7 @@ GitHub API から最終成功 run を直接取得できない制約も残るた�
 
 ## 並走: 検証 (個人開発版)
 
-事前 interview と組織 pilot は個人開発では実行困難なため、「最小公開 → シグナル観測」に置き換える (2026-08-01 grilling で決定)。
+事前 interview と組織 pilot は個人開発では実行困難なため、「最小公開 → シグナル観測」に置き換える (2026-08-01 の設計レビューで決定)。
 
 - **技術関門の維持**: M0 の技術的 No-go 条件は 2026-08-02 の検証では発火しなかった。M1 以降も inferred な stalled の誤検出を観測し、Evidence が行動判断に足りなくなった場合は No-go を再評価する。
 - **dogfooding を一次検証にする**: 2026-08-02 の初回値は `coverage_gap` 8件、`paused_or_stalled` 0件、`blocked` 0件、`merged_not_effective` 0件、修正0件だった。以後も同じ項目を記録する。

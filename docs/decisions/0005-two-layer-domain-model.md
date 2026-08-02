@@ -5,7 +5,7 @@
 
 ## 背景
 
-設立調査の「11 状態モデル」は、README ではリポジトリ単位の排他的状態のように読めた。しかし 11 状態は粒度が混在しており (`coverage_gap` は manifest、`update_open` / `blocked` は PR、`vulnerable_unpatched` / `sla_breached` は alert、`exception_active` は例外レコードの属性)、現実のリポジトリは複数の異常を同時に持つ。排他的状態に潰すと証跡が失われ、「証跡で説明する」という製品価値と矛盾する。2026-08-01 の grilling で構造を確定した。
+設立調査の「11 状態モデル」は、README ではリポジトリ単位の排他的状態のように読めた。しかし 11 状態は粒度が混在しており (`coverage_gap` は manifest、`update_open` / `blocked` は PR、`vulnerable_unpatched` / `sla_breached` は alert、`exception_active` は例外レコードの属性)、現実のリポジトリは複数の異常を同時に持つ。排他的状態に潰すと証跡が失われ、「証跡で説明する」という製品価値と矛盾する。2026-08-01 の設計レビューで構造を確定した。
 
 ## 決定
 

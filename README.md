@@ -2,8 +2,6 @@
 
 **English** | [日本語](README.ja.md)
 
-![A geometric cat observing dependency update evidence routes](docs/assets/depatrol-readme-header.png)
-
 Read-only control plane for dependency update bots.
 
 depatrol watches Dependabot and Renovate across all your repositories and answers one question with evidence: **is every repository actually receiving and absorbing dependency updates?**
