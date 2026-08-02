@@ -5,7 +5,7 @@
 
 ## 背景
 
-domain model の grilling (2026-08-01) で、GitHub から観測できない depatrol 固有の入力 — 組織 policy (`policy_drift` と SLA の判定基準)、owner マッピング、例外レコード (owner・理由・期限) — をどこに置くかが未決だった。
+domain model の設計レビュー (2026-08-01) で、GitHub から観測できない depatrol 固有の入力 — 組織 policy (`policy_drift` と SLA の判定基準)、owner マッピング、例外レコード (owner・理由・期限) — をどこに置くかが未決だった。
 
 候補は (a) depatrol の DB + 管理 UI/API、(b) git 管理の宣言的 YAML、(c) GitHub の label / issue への記録、の三つ。
 

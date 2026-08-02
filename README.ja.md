@@ -2,8 +2,6 @@
 
 [English](README.md) | **日本語**
 
-![依存関係更新の証跡を観測する幾何学的な猫](docs/assets/depatrol-readme-header.png)
-
 依存関係更新 bot のための read-only control plane。
 
 depatrol は Dependabot と Renovate をリポジトリ横断で監視し、一つの問いに証跡付きで答える: **すべてのリポジトリは、依存関係の更新を実際に受け取り、取り込めているか?**
