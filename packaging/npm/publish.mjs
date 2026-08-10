@@ -1,15 +1,23 @@
 #!/usr/bin/env node
-// Idempotent npm publish for the packages staged by prepare.mjs.
-// Platform packages go first so the main package never points at a
-// version that is not yet installable (runbook: publish 順は platform →
-// メイン). Versions already on the registry are skipped — that is what
-// makes a same-tag job re-run repair a partial failure (ADR 0006 決定 3).
+// Pack and publish the packages staged by prepare.mjs.
+//
+// All six tarballs are created before the first registry write. Platform
+// packages are published first and the main package last. A same-version
+// retry is skipped only when the registry SRI exactly matches the tarball
+// built by this run; a mismatch requires a new patch release.
 //
 // Usage: node packaging/npm/publish.mjs <dist-dir> [--dry-run] [--tag <dist-tag>]
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
 
 const args = process.argv.slice(2);
 const distDir = args[0];
@@ -28,54 +36,130 @@ function assertNpmVersion() {
   const ok =
     major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
   if (!ok) {
-    console.error(
-      `publish: npm ${raw} is too old — OIDC trusted publishing needs >= 11.5.1`,
+    throw new Error(
+      "npm " + raw + " is too old; OIDC trusted publishing needs >= 11.5.1",
     );
-    process.exit(1);
   }
 }
 
-function isPublished(name, version) {
-  // npm 11 exits non-zero (E404) for a missing package and for a missing
-  // version; older npm exited zero with empty output for the latter.
-  // Either way, only "prints the version" counts as published — anything
-  // else falls through to publishing, which is the safe direction.
-  const result = spawnSync("npm", ["view", `${name}@${version}`, "version"], {
-    encoding: "utf8",
-  });
-  return result.status === 0 && result.stdout.includes(version);
+function publishedIntegrity(name, version) {
+  const result = spawnSync(
+    "npm",
+    ["view", name + "@" + version, "dist.integrity", "--json"],
+    { encoding: "utf8" },
+  );
+  if (result.status === 0) {
+    const value = JSON.parse(result.stdout);
+    if (typeof value !== "string" || value.length === 0) {
+      throw new Error("registry returned an invalid integrity for " + name + "@" + version);
+    }
+    return value;
+  }
+  if ((result.stderr || "").includes("E404")) {
+    return null;
+  }
+  throw new Error(
+    "registry lookup failed for " +
+      name +
+      "@" +
+      version +
+      ":\n" +
+      (result.stderr || result.stdout),
+  );
+}
+
+function packPackage(dir, packDir) {
+  const output = execFileSync(
+    "npm",
+    ["pack", "--json", "--pack-destination", packDir],
+    { cwd: dir, encoding: "utf8" },
+  );
+  const records = JSON.parse(output);
+  if (!Array.isArray(records) || records.length !== 1) {
+    throw new Error("npm pack returned an unexpected result for " + dir);
+  }
+  const record = records[0];
+  if (!record.filename || !record.integrity) {
+    throw new Error("npm pack omitted filename or integrity for " + dir);
+  }
+  return {
+    tarball: join(packDir, record.filename),
+    integrity: record.integrity,
+  };
+}
+
+function stagedPackages(root) {
+  return readdirSync(root)
+    .filter((entry) => existsSync(join(root, entry, "package.json")))
+    .sort((a, b) => {
+      if (a === "depatrol") return 1;
+      if (b === "depatrol") return -1;
+      return a.localeCompare(b);
+    });
 }
 
 assertNpmVersion();
 
-const staged = readdirSync(distDir)
-  .filter((entry) => existsSync(join(distDir, entry, "package.json")))
-  .sort((a, b) => {
-    if (a === "depatrol") return 1; // main package last
-    if (b === "depatrol") return -1;
-    return a.localeCompare(b);
-  });
-
-if (staged.length === 0) {
-  console.error(`publish: nothing staged in ${distDir} — run prepare.mjs first`);
+const resolvedDist = isAbsolute(distDir) ? distDir : join(process.cwd(), distDir);
+const staged = stagedPackages(resolvedDist);
+if (staged.length !== 6 || staged.at(-1) !== "depatrol") {
+  console.error("publish: expected five platform packages followed by depatrol");
   process.exit(1);
 }
 
-for (const entry of staged) {
-  const dir = join(distDir, entry);
-  const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
-  const id = `${manifest.name}@${manifest.version}`;
-  if (isPublished(manifest.name, manifest.version)) {
-    console.log(`publish: skip ${id} (already on the registry)`);
-    continue;
+const packDir = mkdtempSync(join(tmpdir(), "depatrol-npm-pack-"));
+try {
+  const packed = staged.map((entry) => {
+    const dir = join(resolvedDist, entry);
+    const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+    const archive = packPackage(dir, packDir);
+    return {
+      id: manifest.name + "@" + manifest.version,
+      name: manifest.name,
+      version: manifest.version,
+      ...archive,
+    };
+  });
+
+  const decisions = packed.map((item) => {
+    if (dryRun) {
+      return { item, publish: true };
+    }
+
+    const remote = publishedIntegrity(item.name, item.version);
+    if (remote === item.integrity) {
+      return { item, publish: false };
+    }
+    if (remote !== null) {
+      throw new Error(
+        "registry integrity mismatch for " +
+          item.id +
+          "; do not replace the version, create a patch release",
+      );
+    }
+    return { item, publish: true };
+  });
+
+  for (const decision of decisions) {
+    const { item } = decision;
+    if (!decision.publish) {
+      console.log("publish: skip " + item.id + " (registry integrity matches)");
+      continue;
+    }
+
+    const publishArgs = ["publish", item.tarball, "--access", "public"];
+    if (distTag) {
+      publishArgs.push("--tag", distTag);
+    }
+    if (dryRun) {
+      publishArgs.push("--dry-run");
+    }
+    console.log("publish: " + item.id + (dryRun ? " (dry run)" : ""));
+    execFileSync("npm", publishArgs, { stdio: "inherit" });
   }
-  const publishArgs = ["publish", "--access", "public"];
-  if (distTag) {
-    publishArgs.push("--tag", distTag);
-  }
-  if (dryRun) {
-    publishArgs.push("--dry-run");
-  }
-  console.log(`publish: ${id}${dryRun ? " (dry run)" : ""}`);
-  execFileSync("npm", publishArgs, { cwd: dir, stdio: "inherit" });
+} catch (error) {
+  console.error("publish: " + error.message);
+  process.exitCode = 1;
+} finally {
+  rmSync(packDir, { recursive: true, force: true });
 }

@@ -1,7 +1,5 @@
-# Tag push is the only release trigger (ADR 0006: タグが release ID).
-# Jobs are split per channel so permissions stay minimal and a partial
-# failure is repaired by re-running the failed job on the same tag.
-# Every action is pinned to a full commit SHA (docs/runbooks/release.md).
+# A signed stable tag is the only release trigger. The build job creates one
+# attested bundle; GitHub Release and npm consume that exact bundle.
 name: release
 
 on:
@@ -9,50 +7,154 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions: {}
 
 jobs:
-  github-release:
+  release-guard:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # full history for changelog generation
+          fetch-depth: 0
+      - name: Verify release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release/guard.sh "$GITHUB_REF_NAME"
+
+  release-validation:
+    needs: release-guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      # renovate: datasource=npm depName=npm versioning=npm
+      - run: npm install -g npm@11.19.0
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
+          # renovate: datasource=github-releases depName=goreleaser/goreleaser versioning=semver-coerced
           version: v2.17.1
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          install-only: true
+      - run: bash scripts/ci/verify.sh
+      - run: bash scripts/release/preflight.sh
 
-  npm:
-    needs: github-release
+  release-build:
+    needs: release-validation
     runs-on: ubuntu-latest
     permissions:
-      contents: read # gh release download
-      id-token: write # OIDC trusted publishing
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          # renovate: datasource=github-releases depName=goreleaser/goreleaser versioning=semver-coerced
+          version: v2.17.1
+          install-only: true
+      - name: Build release assets once
+        run: goreleaser release --clean --skip=publish
+      - name: Generate release notes
+        run: bash scripts/release/notes.sh "$GITHUB_REF_NAME" > release-notes.md
+      - name: Create verified release bundle
+        run: >-
+          node scripts/release/artifacts.mjs create
+          dist release-bundle "$GITHUB_REF_NAME" "$GITHUB_SHA" release-notes.md
+      - name: Attest release bundle
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: release-bundle/*
+      - name: Upload immutable workflow artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ github.ref_name }}-${{ github.sha }}
+          path: release-bundle/*
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
+          retention-days: 30
+
+  github-release:
+    needs: release-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      attestations: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24"
-      # publish.mjs asserts npm >= 11.5.1 (OIDC minimum, runbook).
-      - run: npm install -g npm@11
-      - name: Download and verify release archives
+          node-version-file: .node-version
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ github.ref_name }}-${{ github.sha }}
+          path: release-bundle
+      - name: Verify build provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release/verify-attestations.sh release-bundle
+      - name: Publish or verify immutable GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMMUTABLE_RELEASES_ENABLED: ${{ vars.IMMUTABLE_RELEASES_ENABLED }}
+        run: bash scripts/release/publish-github.sh "$GITHUB_REF_NAME" release-bundle
+
+  npm:
+    needs:
+      - release-build
+      - github-release
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ github.ref_name }}-${{ github.sha }}
+          path: release-bundle
+      - name: Verify release bundle and build provenance
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "$GITHUB_REF_NAME" --dir artifacts \
-            --pattern '*.tar.gz' --pattern '*.zip' --pattern '*checksums.txt'
-          cd artifacts
-          sha256sum --check --ignore-missing ./*checksums.txt
-      - name: Repackage archives into npm packages
-        run: node packaging/npm/prepare.mjs "${GITHUB_REF_NAME#v}" artifacts
-      - name: Publish (idempotent, platform packages before main)
+          node scripts/release/artifacts.mjs verify \
+            release-bundle "$GITHUB_REF_NAME" "$GITHUB_SHA"
+          bash scripts/release/verify-attestations.sh release-bundle
+      # renovate: datasource=npm depName=npm versioning=npm
+      - run: npm install -g npm@11.19.0
+      - name: Repackage release archives
+        run: |
+          version=$(printf '%s' "$GITHUB_REF_NAME" | cut -c2-)
+          node packaging/npm/prepare.mjs "$version" release-bundle
+      - name: Publish exact tarballs
         run: node packaging/npm/publish.mjs packaging/npm/dist

@@ -1,0 +1,14 @@
+/.github/CODEOWNERS @necofuryai
+/.github/workflows/ci.yml @necofuryai
+/.github/workflows/release.yml @necofuryai
+/.github/workflows/release-integrity.yml @necofuryai
+/.github/release-baselines.json @necofuryai
+/.github/release-hardening-baseline @necofuryai
+/.github/release-keys/ @necofuryai
+/.node-version @necofuryai
+/.goreleaser.yaml @necofuryai
+/packaging/npm/ @necofuryai
+/renovate.json @necofuryai
+/scripts/ci/ @necofuryai
+/scripts/release/ @necofuryai
+/tools/ @necofuryai

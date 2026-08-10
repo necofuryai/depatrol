@@ -1,75 +1,216 @@
 # Release runbook
 
-ADR 0006 の運用詳細。原則は ADR 0006 が正で、本書は手順・バージョン・チェックリストのみを持つ。事実関係は 2026-08-01 に一次情報で検証し、同日の最小公開準備で本書を確定した。
+[ADR 0006](../decisions/0006-distribution.md) と [ADR 0007](../decisions/0007-build-once-immutable-release.md) の運用手順を定める。
+配布 channel の選択は ADR 0006、release integrity と retry 境界は ADR 0007 を正とする。
+Version と外部サービスの仕様は 2026-08-10 に確認した。
 
-## パイプライン構成 (実装済み)
+## Pipeline
 
-- GoReleaser OSS v2.17.1 ([release.yml](../../.github/workflows/release.yml) が `version: v2.17.1` で固定) + goreleaser/goreleaser-action。設定は [.goreleaser.yaml](../../.goreleaser.yaml)。ldflags はデフォルトのまま使い、[main.go](../../main.go) 側の変数名を合わせる。
-- release workflow 内のすべての action は full commit SHA に固定する (可動タグは使わない)。現在の固定値:
+Pull Request と `main` push では [ci.yml](../../.github/workflows/ci.yml) が次を実行する。
 
-  | action | tag | commit SHA |
-  |---|---|---|
-  | actions/checkout | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
-  | actions/setup-go | v7.0.0 | `b7ad1dad31e06c5925ef5d2fc7ad053ef454303e` |
-  | actions/setup-node | v7.0.0 | `820762786026740c76f36085b0efc47a31fe5020` |
-  | goreleaser/goreleaser-action | v7.2.3 | `f06c13b6b1a9625abc9e6e439d9c05a8f2190e94` |
+- `test` は module integrity、build、vet、format、race test、`govulncheck`、`actionlint`、release script の unit test を実行する。
+- `dependency-review` は Pull Request が追加する `moderate` 以上の既知脆弱性を拒否する。
+- `release-preflight` は write permission と OIDC を持たず、GoReleaser snapshot と npm dry-run までを実行する。
 
-- actions/checkout は `fetch-depth: 0` (changelog 生成に全履歴が必要)。
-- job 分離と権限 (ADR 0006 決定 3):
-  - github-release job: `contents: write`
-  - npm job: `contents: read` (Releases からのダウンロード) + `id-token: write` (OIDC)。Node 24 + npm 11 を使い、publish.mjs が OIDC 最低要件の npm 11.5.1+ を assert する。
-  - tap job (第 2 波): fine-grained PAT (homebrew-tap リポジトリ限定、Contents: Read and write) を Actions secrets で管理。PAT は有効期限で静かに失効するため、失効時は再発行して同一タグで job を再実行する。
-- version stamping: GoReleaser デフォルト ldflags (`-X main.version={{.Version}}` 等) に合わせて main パッケージに version / commit / date 変数を置き、未注入時は `debug.ReadBuildInfo().Main.Version` にフォールバックする (実装済み)。
-- npm 再梱包: npm job が Releases のアーカイブを sha256 checksums 検証つきでダウンロードし、[packaging/npm/prepare.mjs](../../packaging/npm/prepare.mjs) が 6 パッケージに staging、[packaging/npm/publish.mjs](../../packaging/npm/publish.mjs) が publish する。publish は `npm view` で published 済みバージョンをスキップする冪等動作で、順序は platform → メイン。
+Signed tag の push では [release.yml](../../.github/workflows/release.yml) が次の順に動く。
 
-## npm
+```text
+release-guard
+    ↓
+release-validation
+    ↓
+release-build ── attested Actions artifact
+    ├── github-release
+    └── github-release 成功後 ── npm
+```
 
-- パッケージ構成: `depatrol` (bin = Biome 式実行時解決シム: require.resolve + spawnSync、`DEPATROL_BINARY` でのバイナリパス上書きあり) + `@depatrol/cli-{darwin-arm64,darwin-x64,linux-x64,linux-arm64,win32-x64}` (各 package.json に `os` / `cpu` を宣言、バイナリのみ同梱)。optionalDependencies は同一バージョンに完全固定。lifecycle スクリプトは使用しない。
-- `package.json` の `repository` フィールドは実リポジトリと大文字小文字まで厳密一致させる (provenance 検証の条件)。
-- CGO_ENABLED=0 のため musl 変種 (`-musl` パッケージ) は持たない。
-- 既知の落とし穴: 旧 npm が生成した lockfile から他プラットフォームの optional 依存が抜ける npm/cli#4828 (修正済みだが古い lockfile で再現しうる)。README・npm README に「`npm ci` が `Cannot find module @depatrol/...` で失敗したら lockfile を再生成」を記載済み。シムのエラーメッセージも同じ案内を出す。
+Publish 可能な最終 bundle を生成するのは `release-build` だけである。
+`release-validation` は publish permission を持たず、GoReleaser snapshot だけを実行する。
+GitHub Release と npm は `release-${tag}-${commit}` という同じ Actions artifact を入力にする。
+Artifact は 30 日保持し、同名 upload の上書きを禁止する。
 
-### 初回 bootstrap (stub 方式)
+GoReleaser の publisher は [.goreleaser.yaml](../../.goreleaser.yaml) で無効化する。
+Release build は `--skip=publish` を必須とし、明示した ldflags で version、full commit、commit date を埋め込む。
 
-trusted publisher の登録は既存パッケージの設定画面からしか行えず、granular token による手動 publish には provenance が付かない。v0.1.0 を token で publish すると検証チェックリスト「v0.1.0 に provenance」が満たせないため、**中身のない stub バージョンで先にパッケージ名だけを作り、v0.1.0 本体は最初から OIDC で publish する**:
+現在の固定 version は次のとおりである。
 
-0. 前提: npm org `depatrol` が存在すること (2026-08-01 取得済み)。scoped パッケージの publish には username か既存 org のスコープが必須で、org 名が取れない場合のフォールバックは `@necofuryai` スコープ (ADR 0006 決定 4)。フォールバック時は packaging/npm/ 内の `@depatrol` 参照 3 箇所 (メイン package.json の optionalDependencies、シムの PLATFORMS、prepare.mjs) を改名してから publish する。
-1. npmjs.com で granular token を作成する: Packages and scopes は **Read and write / All packages** (未作成の unscoped `depatrol` は個別指定できない)、**Bypass two-factor authentication を有効化**、有効期限は最短。アカウントの publishing access は既定で「2FA または bypass 付き granular token」を要求するため、bypass 無しの token は publish 時に E403 になる (2026-08-01 実地確認)。`npm login` セッションは publish 時に 2FA の対話を要するため token 方式を推奨。
-2. `node packaging/npm/prepare.mjs 0.0.0-bootstrap --stub`
-3. `node packaging/npm/publish.mjs packaging/npm/dist --tag bootstrap` — 注意: `--tag bootstrap` を付けても、パッケージの初回 publish には npm の仕様で `latest` も同時に付く (2026-08-01 実地確認)。実害はなく、v0.1.0 の publish で `latest` は自動的に移る。
-4. npmjs.com で 6 パッケージそれぞれの Settings → Trusted Publisher に GitHub Actions を登録する: Organization or user `necofuryai` / Repository `depatrol` / Workflow filename `release.yml` (ファイル名のみ) / Environment name 空欄 / **Allowed actions は「Allow npm publish」をチェック** (少なくとも 1 つ必須で、未選択のままでは保存できない — 2026-08-01 実地確認)。保存後、セクションが「Select your publisher」から設定内容の要約表示に変わることを確認する。
-5. granular token を失効させる。以後の長期 credential はゼロ。
-6. v0.1.0 の npm job を (再) 実行する → OIDC + provenance で publish される (公開リポジトリなら provenance は自動付与)。
-7. publish 確認後、6 パッケージの Publishing access を「Require two-factor authentication and disallow bypass 2fa tokens」に切り替える (trusted publisher の動作には影響しない)。bypass token による direct publishing は npm 側でも 2027-01 に廃止予定。
-8. 任意: `npm deprecate depatrol@0.0.0-bootstrap "bootstrap placeholder; install latest"` (5 platform パッケージも同様)。
+| 対象 | version | 固定方法 |
+|---|---:|---|
+| Go | `1.26.5` | `go.mod` |
+| Node.js | `24.19.0` | `.node-version` |
+| npm CLI | `11.19.0` | workflow 内の exact version |
+| GoReleaser | `v2.17.1` | workflow 内の exact version |
+| actionlint | `v1.7.12` | `tools/go.mod` |
+| govulncheck | `v1.6.0` | `tools/go.mod` |
 
-## 最小公開手順 (v0.1.0)
+Go は最新 stable を追従する。
+Renovate は Go toolchain を平日に確認し、release から 1 日後に更新 Pull Request を作成する。
+CI は `actions/setup-go` が `go.mod` を読み、local Mac の mise 設定には依存しない。
 
-1. main で ci.yml が green であること。
-2. 公開前 secret スキャン: git 全履歴と `internal/cli/testdata/cassettes/` (録画時の Authorization ヘッダ) に credential が無いことを確認する。
-3. `gh repo edit necofuryai/depatrol --visibility public --accept-visibility-change-consequences`
-4. `git tag v0.1.0 && git push origin v0.1.0`
-5. github-release job の成果物 (5 アーカイブ + checksums + changelog) を確認する。
-6. npm bootstrap (上記) → 同一タグで npm job を再実行する。
-7. branch protection を設定する (required check = ci / test、PR 必須)。以後 main への直接 commit をやめ、短命ブランチ + PR に統一する ([CONTRIBUTING.md](../../CONTRIBUTING.md) のブランチ戦略)。
-8. 検証チェックリストを消化する。
+Workflow で使う action は full commit SHA に固定する。
 
-チャネル公開は非原子的である (ADR 0006 決定 3)。タグ push 時点で bootstrap 未了なら npm job は失敗するが、これは想定内で、bootstrap + trusted publisher 登録後に同一タグで npm job を rerun して修復する — この rerun がチェックリスト最終項目 (冪等修復) の実地検証を兼ねる。
+| action | tag | commit SHA |
+|---|---|---|
+| `actions/checkout` | `v7.0.1` | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| `actions/setup-go` | `v7.0.0` | `b7ad1dad31e06c5925ef5d2fc7ad053ef454303e` |
+| `actions/setup-node` | `v7.0.0` | `820762786026740c76f36085b0efc47a31fe5020` |
+| `actions/dependency-review-action` | `v5.0.0` | `a1d282b36b6f3519aa1f3fc636f609c47dddb294` |
+| `goreleaser/goreleaser-action` | `v7.2.3` | `f06c13b6b1a9625abc9e6e439d9c05a8f2190e94` |
+| `actions/attest` | `v4.2.2` | `1e69f48acb82d1966a394da916b4c1698aa569d6` |
+| `actions/upload-artifact` | `v7.0.1` | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` |
+| `actions/download-artifact` | `v8.0.1` | `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c` |
 
-再実行の冪等性は `.goreleaser.yaml` の `release.replace_existing_artifacts: true` が支える (未設定だと公開済みリリースへの asset 再アップロードが 422 で恒久失敗し、npm job も `needs` 経由でスキップされる)。github-release job がアップロード途中で失敗した場合は未公開 draft が Releases に残ることがあるので、削除してから再実行する。
+## External configuration
 
-## Homebrew (第 2 波、トリガー到達後)
+Local workflow を有効化する前に、repository と npm に次を設定する。
 
-- tap リポジトリ `necofuryai/homebrew-tap` を作成し、GoReleaser `homebrew_casks` で自動 push する (旧 `brews` は v2.16 で deprecated)。
-- 導入時判断 (ADR 0006 決定 5): 未署名 cask の quarantine を post-install `xattr -dr com.apple.quarantine` hook で除去する (Gatekeeper バイパス — リスク受容の明記が前提) か、Apple Developer Program で署名・notarization するか。
-- homebrew-core: self-submission は 90 forks / 90 watchers / 225 stars のいずれか + リポジトリ作成から 30 日 + stable release が条件。充足したら申請し、tap は並存させる。
-- 実機確認 (導入時): `brew install --cask necofuryai/tap/depatrol` が Tap Trust 込みで 1 コマンドで完結すること、`brew upgrade` で cask が更新されること、fine-grained PAT で tap への push が通ること (403 なら classic PAT の repo スコープにフォールバック)。
+1. GitHub Dependency graph と Dependabot alerts を有効化する。
+   Dependabot security updates と version updates は無効のままにする。
+2. `main` ruleset で Pull Request、stale review dismissal、latest push approval、CODEOWNERS review、strict required checks を必須にする。
+   Required checks は新しい job が GitHub Actions で一度成功した後に `test`、`dependency-review`、`release-preflight` を登録する。
+   Renovate Pull Request は maintainer が承認する。
+   Sole maintainer 自身の Pull Request では独立承認を満たせないため、admin の PR-only bypass を意図的な例外として使う。
+3. `v*` tag ruleset で作成者を release operator に限定し、通常の update と delete を禁止する。
+   Renovate App と GitHub Actions には bypass を与えない。
+4. Actions policy は GitHub-owned actions と `goreleaser/goreleaser-action` だけを許可し、full SHA pinning を必須にする。
+5. Repository-level immutable releases を有効化する。
+   この設定は新しい release にだけ適用され、既存 release は immutable にならない。
+6. Administration read token で immutable releases endpoint の `enabled: true` を確認してから、repository variable `IMMUTABLE_RELEASES_ENABLED=true` を設定する。
+   Release workflow の `GITHUB_TOKEN` には Administration read permission がないため、workflow から repository setting endpoint を直接確認しない。
+   Repository variable は rollout 完了の fail-closed acknowledgement とし、公開後は release 自体の `isImmutable` を検証する。
+7. GitHub environment `npm-release` を作成し、deployment branch and tag rule を `v*` に限定する。
+8. npm の 6 package 全てで trusted publisher を `necofuryai/depatrol`、`release.yml`、environment `npm-release`、`npm publish` 許可として登録する。
+   Traditional npm token は使わない。
 
-## 検証チェックリスト (第 1 波、v0.1.0)
+Dependency graph を無効のまま `dependency-review` を required にすると、導入 Pull Request 自体が失敗する。
+必ず手順 1 を CI の required 化より先に実施する。
 
-- [x] タグ push で Releases に 5 ターゲットのアーカイブ + sha256 checksums + changelog が揃う (2026-08-01 確認)
-- [x] `go install github.com/necofuryai/depatrol@v0.1.0` が成功し、`--version` がタグ由来のバージョンを表示する (2026-08-01 確認)
-- [ ] `npx depatrol --version` / `bunx depatrol --version` / `pnpm dlx depatrol --version` が macOS / Linux / Windows で動く (macOS は 3 ランナーとも 2026-08-01 確認済み。Linux / Windows は未確認)
-- [x] `npm install --ignore-scripts` でも動作する (2026-08-01 実レジストリで確認)
-- [x] npm パッケージに provenance が付与されている (`npm audit signatures` で verified attestations を 2026-08-01 確認)
-- [x] publish 部分失敗 → 同一タグでの該当 job 再実行が冪等に修復する (2026-08-01 実証: ENEEDAUTH 失敗 → bootstrap 後の rerun で publish 成功、さらに全 job 再実行で npm 全 skip + Releases asset 置換を確認)
+## Tag guard
+
+`release-guard` は次を全て検証する。
+
+- Tag 名が `vMAJOR.MINOR.PATCH` と完全一致し、leading zero や prerelease suffix がない。
+- Tag が lightweight tag ではなく annotated tag である。
+- `.github/release-keys/` の公開鍵で tag signature を検証できる。
+- GitHub Git Database API でも tag signature が `verified: true`、`reason: valid` である。
+- Tag commit が `.github/release-hardening-baseline` を最初に追加した commit 以後である。
+- Tag commit が `origin/main` の祖先である。
+- Push event の SHA と annotated tag が指す commit が一致する。
+
+Tag commit と実行時点の `origin/main` tip の一致は要求しない。
+Release 実行中に `main` が進んでも正しい release を失敗させないためである。
+Operator の通常手順では、曖昧さを避けるため最新の green な `origin/main` に tag を付ける。
+
+Hardening 導入前の commit には guard 自体が存在しない。
+そのため tag ruleset と release operator の運用は trust boundary に残る。
+
+## Release procedure
+
+1. `main` の `test`、`dependency-review`、`release-preflight` が green であることを確認する。
+2. Local の `main` を `origin/main` に fast-forward し、release 対象 commit を固定する。
+3. 表に記載した exact Node.js、npm、GoReleaser を有効にし、CI と同じ検証を local でも実行する。
+
+   ```console
+   bash scripts/ci/verify.sh
+   bash scripts/release/preflight.sh
+   ```
+
+4. Release notes の差分を確認し、signed annotated tag を作成する。
+
+   ```console
+   git tag -s vX.Y.Z -m "depatrol vX.Y.Z"
+   git verify-tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+5. `release-guard`、`release-validation`、`release-build`、`github-release`、`npm` が順に成功したことを確認する。
+6. GitHub Release が immutable で、manifest、asset digest、attestation が検証できることを確認する。
+
+   ```console
+   gh release view vX.Y.Z --json tagName,isDraft,isImmutable,assets
+   gh release verify vX.Y.Z --repo necofuryai/depatrol
+   gh attestation verify depatrol_X.Y.Z_darwin_arm64.tar.gz \
+     --repo necofuryai/depatrol \
+     --signer-workflow necofuryai/depatrol/.github/workflows/release.yml \
+     --source-ref refs/tags/vX.Y.Z
+   ```
+
+7. npm の 6 package が同じ version で公開され、provenance が付いていることを確認する。
+
+## Build artifact and manifest
+
+`scripts/release/artifacts.mjs` は 5 archive、checksum file、release notes、manifest の file set を固定する。
+Manifest は tag、full commit、各 file の size と SHA-256 digest を記録する。
+作成直後、download 後、GitHub Release 公開前後に同じ verifier を実行する。
+
+`actions/attest` は bundle 内の各 file に build provenance を付与する。
+`release-build` には `id-token: write`、`attestations: write`、`artifact-metadata: write` が必要である。
+Consumer job は `attestations: read` だけを持ち、`gh attestation verify` で source repository、workflow、tag、commit を確認する。
+
+## GitHub Release retry
+
+| 状態 | 動作 |
+|---|---|
+| Release が存在しない | Bot が draft を作成し、全 asset を検証してから publish する。 |
+| `github-actions[bot]` の draft が存在する | Draft を削除して元の Actions artifact から再作成する。 |
+| 別 actor の draft が存在する | 自動削除せず停止し、operator が内容を確認する。 |
+| 正しい immutable release が存在する | Asset と attestation を再検証し、成功済みとして終了する。 |
+| Mutable release または digest 不一致 | 同じ tag を修復せず停止し、新しい patch release を要求する。 |
+
+公開処理は draft に全 asset を upload し、manifest と remote digest が一致してから publish する。
+公開後に `isImmutable: true` にならなければ失敗する。
+
+## npm publish and retry
+
+`packaging/npm/prepare.mjs` は Actions artifact の archive を 6 package に staging する。
+`packaging/npm/publish.mjs` は全 package を先に `npm pack --json` し、tarball と SRI を固定する。
+Platform package を先に publish し、main package `depatrol` を最後に publish する。
+
+同じ version が registry に存在する場合は、`dist.integrity` と local tarball の SRI が完全一致するときだけ skip する。
+Version が存在しても SRI が異なる場合は、1 package も追加 publish せず失敗する。
+
+GitHub Release 成功後に npm だけが失敗した場合は、30 日以内に同じ workflow run の failed jobs だけを再実行する。
+
+```console
+gh run rerun RUN_ID --failed
+```
+
+`Re-run all jobs` は使わない。
+Build job が同名 artifact の upload に失敗することで、再 build した別成果物の publish path への混入を防ぐ。
+Artifact の retention を超えた場合は新しい patch release を作成する。
+
+## Signing key rotation
+
+1. 新しい公開鍵を `.github/release-keys/` に追加する Pull Request を作成する。
+2. CODEOWNERS review と required checks を通して merge する。
+3. 新しい鍵で test tag を local に作成し、`scripts/release/guard.sh` の local 検証を通す。
+4. 次の release tag を新しい鍵で署名する。
+5. 古い公開鍵は historical tag の検証に必要なため削除しない。
+
+秘密鍵を repository、Actions secret、artifact に置いてはならない。
+鍵の失効や端末喪失時も、tag ruleset を解除して unsigned tag を許可しない。
+
+## Historical mutable releases
+
+`v0.1.0` と `v0.1.1` は immutable releases の有効化前に公開されたため mutable である。
+`.github/release-baselines.json` は tag commit と各 asset の name、size、digest を固定する。
+[release-integrity.yml](../../.github/workflows/release-integrity.yml) は毎日 baseline との drift と tag signature を read-only で検証する。
+
+Baseline を通常の release retry のために更新してはならない。
+差分を検出した場合は公開を停止し、GitHub audit log と workflow history を確認した上で、新しい patch release で正しい成果物を配布する。
+
+## npm package layout
+
+Main package は `depatrol`、platform package は `@depatrol/cli-{darwin-arm64,darwin-x64,linux-x64,linux-arm64,win32-x64}` とする。
+Platform package は `os` と `cpu` を宣言し、main package の `optionalDependencies` は同じ exact version に固定する。
+Lifecycle script は使用しない。
+CGO を無効にしているため musl variant は持たない。
+
+既存 6 package は bootstrap 済みであり、現在は trusted publishing を使う。
+新しい package を追加する場合だけ、短命な granular token で stub version を作成し、trusted publisher 登録後に token を失効させる。
+
+## Homebrew
+
+Homebrew は ADR 0006 の第 2 波であり、利用シグナル到達後に導入する。
+導入時は `necofuryai/homebrew-tap` と GoReleaser `homebrew_casks` を使う。
+未署名 cask の quarantine 回避は supply-chain 方針と衝突するため、Apple Developer Program による署名と notarization を優先して再評価する。

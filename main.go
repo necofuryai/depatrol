@@ -7,10 +7,10 @@ import (
 	"github.com/necofuryai/depatrol/internal/cli"
 )
 
-// version, commit, and date match GoReleaser's default ldflags
-// (-X main.version={{.Version}} etc.). Builds that skip the injection —
-// go install, plain go build — fall back to the module version recorded
-// in build info (ADR 0006, docs/runbooks/release.md).
+// version, commit, and date match the deterministic GoReleaser ldflags.
+// Builds that skip the injection — go install, plain go build — fall back
+// to the module version recorded in build info (ADR 0006 and the release
+// runbook).
 var (
 	version = ""
 	commit  = ""
@@ -33,7 +33,7 @@ func buildVersion() string {
 	if commit != "" {
 		v += " (commit " + commit
 		if date != "" {
-			v += ", built " + date
+			v += ", commit date " + date
 		}
 		v += ")"
 	}
