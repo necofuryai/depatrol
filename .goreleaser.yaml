@@ -1,9 +1,8 @@
 # GoReleaser OSS v2 configuration. Policy lives in ADR 0006; operational
 # detail (versions, checklist, bootstrap) in docs/runbooks/release.md.
 #
-# ldflags are intentionally left at GoReleaser defaults
-# (-s -w -X main.version/main.commit/main.date); main.go declares the
-# matching variables.
+# ldflags use source metadata instead of the build clock so a retry from the
+# same commit produces the same binaries.
 version: 2
 
 project_name: depatrol
@@ -16,6 +15,8 @@ builds:
     # It also completes reproducibility alongside mod_timestamp below.
     flags:
       - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .CommitDate }}
     goos:
       - darwin
       - linux
@@ -39,14 +40,15 @@ archives:
         formats:
           - zip
 
-# Checksums default to sha256 in checksums.txt — required by the release
-# checklist, so the default is load-bearing.
+# Keep the checksum filename stable for the npm repackaging contract.
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
 
-# Without this, re-running the github-release job on an already-published
-# tag fails all asset uploads with 422 — breaking the same-tag repair
-# model of ADR 0006 決定 3.
+# Publishing is owned by the release workflow after it verifies the shared
+# bundle. A plain goreleaser release must fail closed instead of publishing.
 release:
-  replace_existing_artifacts: true
+  disable: true
 
 changelog:
   sort: asc

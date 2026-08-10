@@ -24,7 +24,7 @@ Maintainers triage every issue. Most labels are GitHub defaults; one is project-
 
 ### Branch and PR workflow
 
-The repository is trunk-based: `main` is the only long-lived branch, and it is protected (required CI check `test`, enforced for admins too), so every change lands through a pull request — maintainers included.
+The repository is trunk-based: `main` is the only long-lived branch, and every change lands through a pull request. The dependency automation rollout makes `test`, `dependency-review`, and `release-preflight` required and requires maintainer review for Renovate pull requests. Until that external GitHub rollout is complete, treat the pull request's live rules and check list as the source of truth. Dependency updates are never auto-merged.
 
 1. Fork (or branch, for maintainers) from `main` using a short-lived branch named `<type>/<topic>`, e.g. `fix/pause-detection`, `docs/renovate-notes`.
 2. Keep the PR small and focused — one concern per PR.
@@ -53,16 +53,19 @@ The sign-off asserts you have the right to submit the change under the project l
 
 ### Before you push
 
-CI runs exactly these; run them locally first (Go version comes from `go.mod`):
+Run the repository validation before pushing. The application Go version comes from `go.mod`; pinned Go-based development tools live in the isolated `tools` module so their dependencies cannot alter the application module graph.
 
 ```console
-go build ./...
-go vet ./...
-gofmt -l .
-go test ./...
+bash scripts/ci/verify.sh
 ```
 
-`gofmt -l .` must print nothing. Behaviour changes need tests — HTTP interactions are tested with recorded cassettes (`go-vcr`), so no live GitHub token is required to run the suite.
+Changes to release configuration, npm packaging, or release scripts must also pass the publish-free preflight. Use the exact Node.js, npm, and GoReleaser versions listed in the [release runbook](docs/runbooks/release.md); CI remains the authoritative pinned environment.
+
+```console
+bash scripts/release/preflight.sh
+```
+
+Both commands are read-only with respect to GitHub and npm. Behaviour changes need tests — HTTP interactions are tested with recorded cassettes (`go-vcr`), so no live GitHub token is required to run the suite.
 
 ## License
 

@@ -1,0 +1,2 @@
+# The first commit that contains this file is the minimum release baseline.
+# scripts/release/guard.sh derives that commit from Git history.

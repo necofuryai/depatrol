@@ -1,0 +1,98 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":automergeDisabled",
+    ":gitSignOff",
+    ":semanticCommits",
+    ":semanticCommitScopeDisabled"
+  ],
+  "enabledManagers": ["gomod", "github-actions", "nodenv", "custom.regex"],
+  "timezone": "Asia/Tokyo",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "7 days",
+  "prConcurrentLimit": 4,
+  "prHourlyLimit": 2,
+  "pruneStaleBranches": true,
+  "automerge": false,
+  "platformAutomerge": false,
+  "dependencyDashboard": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "automerge": false,
+    "labels": ["security"],
+    "minimumReleaseAge": null
+  },
+  "postUpdateOptions": ["gomodTidy"],
+  "packageRules": [
+    {
+      "description": "Require approval before major update PR creation",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Track the latest stable Go toolchain promptly",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump",
+      "schedule": ["before 6am every weekday"],
+      "minimumReleaseAge": "1 day",
+      "dependencyDashboardApproval": false,
+      "automerge": false
+    },
+    {
+      "description": "Group non-major direct Go module updates",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["require"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Go module dependencies"
+    },
+    {
+      "description": "Keep release workflow changes manual",
+      "matchFileNames": [".github/workflows/release.yml"],
+      "dependencyDashboardApproval": true,
+      "automerge": false
+    },
+    {
+      "description": "Keep custom release tool updates manual",
+      "matchManagers": ["custom.regex"],
+      "dependencyDashboardApproval": true,
+      "automerge": false
+    },
+    {
+      "description": "Check SHA-pinned GitHub Actions on weekdays",
+      "matchManagers": ["github-actions"],
+      "schedule": ["before 6am every weekday"],
+      "minimumReleaseAge": "1 day"
+    },
+    {
+      "description": "Group non-major GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "GitHub Actions"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update GoReleaser version",
+      "managerFilePatterns": [
+        "/^\\.github/workflows\\/(?:ci|release)\\.yml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+version: (?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update npm CLI version used for release",
+      "managerFilePatterns": [
+        "/^\\.github/workflows\\/(?:ci|release)\\.yml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+- run: npm install -g npm@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ]
+    }
+  ]
+}

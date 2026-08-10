@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "repository": "necofuryai/depatrol",
+  "releases": [
+    {
+      "tag": "v0.1.0",
+      "commit": "58105391a9bcc700c62812351d83b032c402f55b",
+      "assets": [
+        {
+          "name": "depatrol_0.1.0_checksums.txt",
+          "size": 501,
+          "digest": "sha256:052c0c59206088b2840cabe746d758cf2dba029569611a8597038b4619149ca7"
+        },
+        {
+          "name": "depatrol_0.1.0_darwin_amd64.tar.gz",
+          "size": 3432387,
+          "digest": "sha256:a89080aa3ce9bad31feec28fc7b5ca036f1900c216ec8db41deb6e5b205461cd"
+        },
+        {
+          "name": "depatrol_0.1.0_darwin_arm64.tar.gz",
+          "size": 3181260,
+          "digest": "sha256:70f337be4f6191d41b7028e4227ff766e690da73f803116798a36de453a558bc"
+        },
+        {
+          "name": "depatrol_0.1.0_linux_amd64.tar.gz",
+          "size": 3384355,
+          "digest": "sha256:329525607d36ee740095952db9fcaf60831e2477071dacedffe1df57a1fa6e59"
+        },
+        {
+          "name": "depatrol_0.1.0_linux_arm64.tar.gz",
+          "size": 3070366,
+          "digest": "sha256:472da1804dc89216dc79aa3e26fec3be4076c2a1d8fec0d4bf76e62963488b0d"
+        },
+        {
+          "name": "depatrol_0.1.0_windows_amd64.zip",
+          "size": 3471698,
+          "digest": "sha256:0c6d48fd5d2ec911b773cdba386713c4defa80637de7e032bcc1ce146fa0f6a4"
+        }
+      ]
+    },
+    {
+      "tag": "v0.1.1",
+      "commit": "7743038081690b8e96709577344fc89ed49c8826",
+      "assets": [
+        {
+          "name": "depatrol_0.1.1_checksums.txt",
+          "size": 501,
+          "digest": "sha256:8ce36692ff1c93544c379c94322db101cd163e47ba87579f26336bc6bafbf888"
+        },
+        {
+          "name": "depatrol_0.1.1_darwin_amd64.tar.gz",
+          "size": 3434227,
+          "digest": "sha256:37b0e00287db38c5a50b014db02e0b5847a669d5f89586d926d92a74660e25cc"
+        },
+        {
+          "name": "depatrol_0.1.1_darwin_arm64.tar.gz",
+          "size": 3183088,
+          "digest": "sha256:21392f2c0349847c9b9821f823fa9d9c69cb2151b122a8080be722fe41a59d20"
+        },
+        {
+          "name": "depatrol_0.1.1_linux_amd64.tar.gz",
+          "size": 3385598,
+          "digest": "sha256:75209aa66b371e6be74de704b5a407ec9e1ff6503705d919c9adc4c08bf50e77"
+        },
+        {
+          "name": "depatrol_0.1.1_linux_arm64.tar.gz",
+          "size": 3073341,
+          "digest": "sha256:d6c559d24cdfe8c3bbedbd43ee157f9a20d418c0c5a0368515ea66f26e4b3553"
+        },
+        {
+          "name": "depatrol_0.1.1_windows_amd64.zip",
+          "size": 3476589,
+          "digest": "sha256:610f850e56625e7d1abf561bdde4acfff22d679f0a6fbc5d1b8e2de11b3f2301"
+        }
+      ]
+    }
+  ]
+}
