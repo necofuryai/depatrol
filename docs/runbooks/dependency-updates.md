@@ -43,7 +43,7 @@ Go module と GitHub Actions の non-major update は、それぞれ一つの Pu
 4. CI を一度実行し、`test`、`dependency-review`、`release-preflight` を GitHub Actions の required checks として登録する。
 5. `renovate.json` を default branch に merge する。
 6. 標準 Mend Renovate App を `necofuryai/depatrol` だけに install する。
-7. Dependency Dashboard と最初の onboarding Pull Request を確認する。
+7. App が既存 `renovate.json` を直接読み、Dependency Dashboard と最初の update Pull Request を作成することを確認する。
 
 Dependency graph の有効化は Dependency Review の required 化より先に行う。
 Renovate App を all repositories へ install しない。
@@ -93,5 +93,5 @@ GoReleaser、Node.js、npm CLI は manual update と `release-preflight` で維�
 これは一時運用であり、通常構成では `.github/dependabot.yml` を置かない。
 
 長期化する場合は Renovate の self-hosted runner を default branch の設定から起動する。
-移行時は同じ `renovate.json`、同じ bot identity、最小 permission、same-repository branch、concurrency lock を維持する。
+移行時は同じ `renovate.json` を再利用し、新しい bot identity の permission、DCO、ruleset、same-repository branch、concurrency lock への影響を確認する。
 Hosted App と self-hosted job を同時に動かしてはならない。

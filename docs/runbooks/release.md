@@ -70,17 +70,21 @@ Local workflow を有効化する前に、repository と npm に次を設定す�
    Required checks は新しい job が GitHub Actions で一度成功した後に `test`、`dependency-review`、`release-preflight` を登録する。
    Renovate Pull Request は maintainer が承認する。
    Sole maintainer 自身の Pull Request では独立承認を満たせないため、admin の PR-only bypass を意図的な例外として使う。
-3. `v*` tag ruleset で作成者を release operator に限定し、通常の update と delete を禁止する。
+3. `release-tag-creation` ruleset で `v*` tag の creation を制限し、release operator の repository role だけに `always` bypass を与える。
    Renovate App と GitHub Actions には bypass を与えない。
-4. Actions policy は GitHub-owned actions と `goreleaser/goreleaser-action` だけを許可し、full SHA pinning を必須にする。
-5. Repository-level immutable releases を有効化する。
+4. `release-tag-immutability` ruleset で `v*` tag の update と deletion を制限し、通常運用の bypass actor を設定しない。
+   Creation 用 bypass をこの ruleset に流用してはならない。
+5. Actions policy は GitHub-owned actions と `goreleaser/goreleaser-action` だけを許可し、full SHA pinning を必須にする。
+6. Repository-level immutable releases を有効化する。
    この設定は新しい release にだけ適用され、既存 release は immutable にならない。
-6. Administration read token で immutable releases endpoint の `enabled: true` を確認してから、repository variable `IMMUTABLE_RELEASES_ENABLED=true` を設定する。
+7. Administration read token で immutable releases endpoint の `enabled: true` を確認してから、repository variable `IMMUTABLE_RELEASES_ENABLED=true` を設定する。
    Release workflow の `GITHUB_TOKEN` には Administration read permission がないため、workflow から repository setting endpoint を直接確認しない。
    Repository variable は rollout 完了の fail-closed acknowledgement とし、公開後は release 自体の `isImmutable` を検証する。
-7. GitHub environment `npm-release` を作成し、deployment branch and tag rule を `v*` に限定する。
-8. npm の 6 package 全てで trusted publisher を `necofuryai/depatrol`、`release.yml`、environment `npm-release`、`npm publish` 許可として登録する。
-   Traditional npm token は使わない。
+8. 新しい release tag の作成を一時停止する。
+9. GitHub environment `npm-release` を作成し、deployment branch and tag rule を `v*` に限定する。
+10. npm の 6 package 全てで trusted publisher を `necofuryai/depatrol`、`release.yml`、environment `npm-release`、`npm publish` 許可として登録する。
+11. 6 package の設定が一致することを確認してから release tag freeze を解除する。
+12. 最初の trusted publish 成功後に traditional automation token が残っていれば revoke し、各 package の publishing access を token 不許可へ強化する。
 
 Dependency graph を無効のまま `dependency-review` を required にすると、導入 Pull Request 自体が失敗する。
 必ず手順 1 を CI の required 化より先に実施する。
@@ -106,7 +110,8 @@ Hardening 導入前の commit には guard 自体が存在しない。
 
 ## Release procedure
 
-1. `main` の `test`、`dependency-review`、`release-preflight` が green であることを確認する。
+1. Release 対象を merge した Pull Request で `test`、`dependency-review`、`release-preflight` が green だったことを確認する。
+   `main` push では PR 専用の `dependency-review` は skip されるため、`main` 上では `test` と `release-preflight` の成功を確認する。
 2. Local の `main` を `origin/main` に fast-forward し、release 対象 commit を固定する。
 3. 表に記載した exact Node.js、npm、GoReleaser を有効にし、CI と同じ検証を local でも実行する。
 
