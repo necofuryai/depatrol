@@ -15,6 +15,7 @@
 ## Checklist
 
 - [ ] Commits are signed off (`git commit -s`, DCO — required, see CONTRIBUTING.md)
-- [ ] `go build ./...`, `go vet ./...`, `gofmt -l .` (no output), `go test ./...` pass locally
+- [ ] `bash scripts/ci/verify.sh` passes locally
+- [ ] `bash scripts/release/preflight.sh` passes for release or npm packaging changes (if applicable)
 - [ ] Behaviour changes carry tests
 - [ ] Product-boundary or architecture changes have an ADR in `docs/decisions/` (if applicable)

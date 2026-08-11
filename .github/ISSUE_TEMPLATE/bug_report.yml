@@ -14,7 +14,7 @@ body:
     attributes:
       label: depatrol version
       description: Output of `depatrol --version`.
-      placeholder: v0.1.0
+      placeholder: depatrol version X.Y.Z (commit SHA, commit date YYYY-MM-DDTHH:MM:SSZ)
     validations:
       required: true
   - type: dropdown
@@ -54,6 +54,6 @@ body:
     id: context
     attributes:
       label: Additional context
-      description: Anything else relevant — bot configuration in the scanned repository (Dependabot/Renovate), token scopes, org size, etc.
+      description: Anything else relevant — Dependabot configuration in the scanned repository, token scopes, org size, etc.
     validations:
       required: false

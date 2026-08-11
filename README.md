@@ -6,7 +6,7 @@
 
 Read-only control plane for dependency update bots.
 
-depatrol watches Dependabot and Renovate across all your repositories and answers one question with evidence: **is every repository actually receiving and absorbing dependency updates?**
+depatrol currently watches Dependabot across GitHub repositories and answers one question with evidence: **is every repository actually receiving and absorbing dependency updates?** Renovate support is planned for M1.
 
 Existing tools tell you a bot is *configured* (OpenSSF Scorecard, Evergreen) or aggregate open alerts (GitHub Security Overview, Dependency-Track). None of them verify, bot-neutrally and continuously, that:
 
@@ -22,7 +22,7 @@ Existing tools tell you a bot is *configured* (OpenSSF Scorecard, Evergreen) or 
 
 ## Status
 
-Pre-alpha. The first milestone — a feasibility-spike CLI that scans repositories with read-only GitHub credentials and reports the conditions below, every judgment carrying its evidence chain marked `confirmed` or `inferred` — is released as **v0.1.0**; see [Installation](#installation).
+Pre-alpha. The completed M0 feasibility-spike CLI is available in the [latest release](https://github.com/necofuryai/depatrol/releases/latest) and through npm. It scans repositories with read-only GitHub credentials and reports the conditions below, with every judgment carrying an evidence chain marked `confirmed` or `inferred`; see [Installation](#installation).
 
 Scope today is Dependabot on GitHub. Renovate (M1), default-branch re-verification of version updates (M2), and the governance engine — policy, owners, exceptions, SLA (M3) — are not implemented yet; [ROADMAP.md](ROADMAP.md) says what each milestone adds. The domain model is settled (see [CONTEXT.md](CONTEXT.md) and [docs/decisions/](docs/decisions/)); the implementation language is Go (ADR 0002).
 
@@ -49,6 +49,22 @@ go install github.com/necofuryai/depatrol@latest
 ### Binary archives
 
 [GitHub Releases](https://github.com/necofuryai/depatrol/releases) carries archives for darwin (arm64 / amd64), linux (amd64 / arm64), and windows (amd64), each release with sha256 checksums.
+
+### Release integrity
+
+Starting with v0.1.2, GitHub Releases are immutable. GitHub Releases and npm publish from the same attested Actions artifact ([ADR 0007](docs/decisions/0007-build-once-immutable-release.md)).
+
+Verify the signed attestation for the latest release:
+
+```console
+gh release verify --repo necofuryai/depatrol
+```
+
+To verify that a downloaded archive exactly matches a release asset:
+
+```console
+gh release verify-asset RELEASE-TAG ARCHIVE-PATH --repo necofuryai/depatrol
+```
 
 ## Domain model
 
@@ -83,7 +99,7 @@ In cross-repository views, each repository is labeled with the most severe condi
 
 A condition covered by an approved exception is suppressed from the rollup (but stays recorded); a repository whose every condition is suppressed shows `exception_active`.
 
-This table is the full vocabulary, not the current output: `policy_drift`, `sla_breached`, and `exception_active` depend on the governance engine (M3) and are not emitted by v0.1.0.
+This table is the full vocabulary, not the current output: `policy_drift`, `sla_breached`, and `exception_active` depend on the governance engine (M3) and are not emitted by the current M0 CLI.
 
 ## Background
 

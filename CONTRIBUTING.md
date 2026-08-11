@@ -24,7 +24,7 @@ Maintainers triage every issue. Most labels are GitHub defaults; one is project-
 
 ### Branch and PR workflow
 
-The repository is trunk-based: `main` is the only long-lived branch, and every change lands through a pull request. The dependency automation rollout makes `test`, `dependency-review`, and `release-preflight` required and requires maintainer review for Renovate pull requests. Until that external GitHub rollout is complete, treat the pull request's live rules and check list as the source of truth. Dependency updates are never auto-merged.
+The repository is trunk-based: `main` is the only long-lived branch, and every change lands through a pull request. The active `main` ruleset requires `test`, `dependency-review`, and `release-preflight`, together with one approving review and approval of the latest push by someone other than its author. Renovate pull requests require maintainer review, and dependency updates are never auto-merged. Treat each pull request's live rules and check list as the final source of truth.
 
 1. Fork (or branch, for maintainers) from `main` using a short-lived branch named `<type>/<topic>`, e.g. `fix/pause-detection`, `docs/renovate-notes`.
 2. Keep the PR small and focused — one concern per PR.
