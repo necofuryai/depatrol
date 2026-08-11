@@ -164,6 +164,9 @@ Consumer job は `attestations: read` だけを持ち、`gh attestation verify` 
 
 公開処理は draft に全 asset を upload し、manifest と remote digest が一致してから publish する。
 公開後に `isImmutable: true` にならなければ失敗する。
+Draft は tag-name endpoint の取得対象外である。
+公開前の検出には全ページを取得した Releases 一覧を使い、再検証と公開には一覧で確定した release ID を使う。
+Tag-name endpoint は、公開後に同じ release ID を返すことの検証にだけ使う。
 
 ## npm publish and retry
 
