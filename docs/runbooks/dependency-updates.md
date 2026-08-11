@@ -20,6 +20,7 @@ Forking Renovate App は使わず、標準 Mend-hosted App が target repository
 ## Renovate policy
 
 [renovate.json](../../renovate.json) は manager を `gomod`、`github-actions`、`nodenv`、`custom.regex` に限定する。
+`baseBranchPatterns` は `"$default"` を明示し、Mend の organization 設定を継承しても GitHub の default branch を使う。
 `npm` manager は有効化しない。
 `packaging/npm/depatrol/package.json` の version は release 時に生成する placeholder であり、dependency update の対象ではない。
 

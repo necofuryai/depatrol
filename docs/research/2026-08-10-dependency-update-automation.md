@@ -5,7 +5,7 @@
 - 読者：リポジトリ管理者とリリース担当者
 - 調査範囲：GitHub Dependabot、Mend-hosted Renovate、GitHub Dependency Review、Go vulnerability management、GitHub Actions と npm trusted publishing
 - 改訂理由：Forking Renovate 固有の継続性リスクを避け、現役の npm OSS における運用実態を反映する
-- 実装状況：repository 内の設定、workflow、検証 script、ADR、runbook は 2026-08-10 に実装済み。GitHub と npm の外部設定、および Mend App の install は未実施
+- 実装状況：repository 内の設定、workflow、検証 script、ADR、runbook は 2026-08-10 に実装済み。外部設定は repository 外の状態であり、runbook に従って live state を確認する
 
 ## 実装結果
 
@@ -448,7 +448,9 @@ Dependency Dashboard は pending、open、ignored、approval 待ちを一つの 
 実装後の設定 file を正とし、本調査文書に duplicate JSON は保持しない。
 
 Custom manager は CI と release の両 workflow にある GoReleaser と npm CLI の exact version を検出する。
-標準 App は default branch の `main` を使うため、単一 branch の現状では `baseBranchPatterns` を追加しない。
+Mend-hosted App は organization 設定を repository 設定へ継承する。
+別 repository 向けの base branch が継承されても `depatrol` の実在しない branch を探索しないよう、`baseBranchPatterns` は `"$default"` を明示する。
+これにより、現在の `main` を文字列で固定せず、GitHub の default branch を使う。
 
 ## automerge の境界
 
