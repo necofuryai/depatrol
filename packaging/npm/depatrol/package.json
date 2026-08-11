@@ -2,10 +2,9 @@
   "name": "depatrol",
   "version": "0.0.0-managed",
   "private": true,
-  "description": "Read-only control plane for Dependabot and Renovate across repositories",
+  "description": "Read-only control plane for Dependabot across GitHub repositories",
   "keywords": [
     "dependabot",
-    "renovate",
     "dependencies",
     "supply-chain",
     "cli"

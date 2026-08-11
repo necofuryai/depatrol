@@ -1,6 +1,7 @@
 # depatrol
 
-Read-only control plane for Dependabot and Renovate across repositories.
+Read-only control plane for Dependabot across GitHub repositories.
+Renovate support is planned for M1.
 
 ```console
 npx depatrol scan --org your-org

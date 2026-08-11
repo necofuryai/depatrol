@@ -6,7 +6,8 @@
 
 依存関係更新 bot のための read-only control plane。
 
-depatrol は Dependabot と Renovate をリポジトリ横断で監視し、一つの問いに証跡付きで答える: **すべてのリポジトリは、依存関係の更新を実際に受け取り、取り込めているか?**
+depatrol は現在、GitHub 上の Dependabot をリポジトリ横断で監視し、一つの問いに証跡付きで答える: **すべてのリポジトリは、依存関係の更新を実際に受け取り、取り込めているか?**
+Renovate 対応は M1 で予定している。
 
 既存のツールは、bot が「設定されている」ことを確認する (OpenSSF Scorecard、Evergreen) か、open な alert を集計する (GitHub Security Overview、Dependency-Track)。しかし、次の点を bot 中立かつ継続的に検証するものはない:
 
@@ -22,7 +23,10 @@ depatrol は Dependabot と Renovate をリポジトリ横断で監視し、一�
 
 ## ステータス
 
-pre-alpha。最初のマイルストーン — read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する feasibility spike CLI (すべての判定には `confirmed` または `inferred` の印が付いた証跡の連鎖が伴う) — は **v0.1.0** として公開済みである ([インストール](#インストール) を参照)。
+現在は pre-alpha である。
+完了済みの M0 feasibility spike CLI は、[最新リリース](https://github.com/necofuryai/depatrol/releases/latest) と npm で公開している。
+read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する。
+すべての判定には、`confirmed` または `inferred` の印が付いた証跡の連鎖が伴う ([インストール](#インストール) を参照)。
 
 現時点の対象は GitHub 上の Dependabot である。Renovate (M1)、version update の default branch 再検証 (M2)、統治エンジン — policy、owner、例外、SLA (M3) — は未実装である。各マイルストーンで何が加わるかは [ROADMAP.md](ROADMAP.md) にある。domain model は確定している ([CONTEXT.md](CONTEXT.md) と [docs/decisions/](docs/decisions/) を参照)。実装言語は Go である (ADR 0002)。
 
@@ -49,6 +53,23 @@ go install github.com/necofuryai/depatrol@latest
 ### バイナリアーカイブ
 
 [GitHub Releases](https://github.com/necofuryai/depatrol/releases) に darwin (arm64 / amd64)、linux (amd64 / arm64)、windows (amd64) のアーカイブと sha256 checksums がある。
+
+### リリースの完全性
+
+v0.1.2 以降の GitHub Release は immutable である。
+GitHub Release と npm は、attestation が付与された同一の Actions artifact を配布元として使う ([ADR 0007](docs/decisions/0007-build-once-immutable-release.md))。
+
+最新 Release の署名済み attestation は、次のコマンドで検証できる。
+
+```console
+gh release verify --repo necofuryai/depatrol
+```
+
+ダウンロードしたアーカイブが Release asset と完全に一致することは、次のコマンドで検証できる。
+
+```console
+gh release verify-asset RELEASE-TAG ARCHIVE-PATH --repo necofuryai/depatrol
+```
 
 ## ドメインモデル
 
@@ -83,7 +104,8 @@ depatrol は二層のモデルを使う:
 
 承認済みの例外が付いた条件は rollup から抑止される (記録には残る)。すべての条件が抑止されたリポジトリには `exception_active` が表示される。
 
-この表は語彙の全体であって、現在の出力ではない。`policy_drift`、`sla_breached`、`exception_active` は統治エンジン (M3) を前提とするため、v0.1.0 では出力されない。
+この表は語彙の全体であって、現在の出力ではない。
+`policy_drift`、`sla_breached`、`exception_active` は統治エンジン (M3) を前提とするため、現行の M0 CLI では出力されない。
 
 ## 背景
 
