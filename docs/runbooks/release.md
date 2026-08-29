@@ -41,7 +41,7 @@ Release build は `--skip=publish` を必須とし、明示した ldflags で ve
 | npm CLI | `11.19.0` | workflow 内の exact version |
 | GoReleaser | `v2.17.1` | workflow 内の exact version |
 | actionlint | `v1.7.12` | `tools/go.mod` |
-| govulncheck | `v1.6.0` | `tools/go.mod` |
+| govulncheck | `v1.7.0` | `tools/go.mod` |
 
 Go は最新 stable を追従する。
 Renovate は、Go toolchain の release から 1 日経過した後、次の Mend job で更新 Pull Request の作成対象にする。
