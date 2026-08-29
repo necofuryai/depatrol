@@ -21,9 +21,11 @@ function fixture() {
   const bin = join(root, "bin");
   const log = join(root, "gh.log");
   const state = join(root, "release-state");
+  const visibility = join(root, "release-visibility");
   const bundle = join(root, "bundle");
   mkdirSync(bin);
   mkdirSync(bundle);
+  writeFileSync(visibility, "0\n");
 
   writeFileSync(
     join(bundle, "release-manifest.json"),
@@ -49,6 +51,19 @@ exit 0
   );
   chmodSync(join(bin, "node"), 0o755);
 
+  writeFileSync(
+    join(bin, "sleep"),
+    `#!/bin/sh
+set -eu
+printf 'sleep %s\\n' "$*" >> "$FAKE_GH_LOG"
+if [ "$FAKE_GH_SCENARIO" = post-create-sleep-error ]; then
+  printf 'fake sleep: interrupted\\n' >&2
+  exit 1
+fi
+`,
+  );
+  chmodSync(join(bin, "sleep"), 0o755);
+
   const fakeGh = `#!/bin/sh
 set -eu
 printf '%s\\n' "$*" >> "$FAKE_GH_LOG"
@@ -56,13 +71,19 @@ state=$(cat "$FAKE_GH_STATE")
 
 bot_draft='{"id":101,"tag_name":"v1.2.3","draft":true,"prerelease":false,"immutable":false,"author":{"login":"github-actions[bot]"},"assets":[]}'
 foreign_draft='{"id":102,"tag_name":"v1.2.3","draft":true,"prerelease":false,"immutable":false,"author":{"login":"someone"},"assets":[]}'
+replacement_draft='{"id":103,"tag_name":"v1.2.3","draft":true,"prerelease":false,"immutable":false,"author":{"login":"github-actions[bot]"},"assets":[]}'
+stale_foreign_draft='{"id":101,"tag_name":"v1.2.3","draft":true,"prerelease":false,"immutable":false,"author":{"login":"someone"},"assets":[]}'
 mutable_release='{"id":101,"tag_name":"v1.2.3","draft":false,"prerelease":false,"immutable":false,"author":{"login":"github-actions[bot]"},"assets":[]}'
 immutable_release='{"id":101,"tag_name":"v1.2.3","draft":false,"prerelease":false,"immutable":true,"author":{"login":"github-actions[bot]"},"assets":[]}'
 
 print_release() {
   case "$state" in
     draft) printf '%s\\n' "$bot_draft" ;;
+    deleting) printf '%s\\n' "$bot_draft" ;;
+    deleting-error) printf '%s\\n' "$bot_draft" ;;
     foreign-draft) printf '%s\\n' "$foreign_draft" ;;
+    replacement-draft) printf '%s\\n' "$replacement_draft" ;;
+    stale-foreign-draft) printf '%s\\n' "$stale_foreign_draft" ;;
     mutable) printf '%s\\n' "$mutable_release" ;;
     immutable) printf '%s\\n' "$immutable_release" ;;
     *) return 1 ;;
@@ -126,6 +147,14 @@ if [ "$1" = api ]; then
         printf 'gh: Server Error (HTTP 500)\\n' >&2
         exit 1
       fi
+      if [ "$FAKE_GH_SCENARIO" = post-create-server-error ] && [ "$state" = draft ]; then
+        printf 'gh: Server Error (HTTP 500)\\n' >&2
+        exit 1
+      fi
+      if [ "$FAKE_GH_SCENARIO" = post-delete-server-error ] && [ "$state" = deleting-error ]; then
+        printf 'gh: Server Error (HTTP 500)\\n' >&2
+        exit 1
+      fi
       if [ "$FAKE_GH_SCENARIO" = empty-outer ]; then
         printf '[]\\n'
         exit 0
@@ -138,8 +167,31 @@ if [ "$1" = api ]; then
         printf '[[%s,%s]]\\n' "$bot_draft" "$foreign_draft"
         exit 0
       fi
-      if [ "$FAKE_GH_SCENARIO" = post-create-missing ] && [ "$state" = draft ]; then
+      if { [ "$FAKE_GH_SCENARIO" = post-create-missing ] || [ "$FAKE_GH_SCENARIO" = post-create-sleep-error ]; } && [ "$state" = draft ]; then
         printf '[[]]\\n'
+        exit 0
+      fi
+      if [ "$FAKE_GH_SCENARIO" = post-create-eventually-visible ] && [ "$state" = draft ]; then
+        visibility=$(cat "$FAKE_GH_VISIBILITY")
+        visibility=$((visibility + 1))
+        printf '%s\\n' "$visibility" > "$FAKE_GH_VISIBILITY"
+        if [ "$visibility" -le 2 ]; then
+          printf '[[]]\\n'
+        else
+          printf '[[%s]]\\n' "$bot_draft"
+        fi
+        exit 0
+      fi
+      if [ "$FAKE_GH_SCENARIO" = post-delete-eventually-absent ] && [ "$state" = deleting ]; then
+        visibility=$(cat "$FAKE_GH_VISIBILITY")
+        visibility=$((visibility + 1))
+        printf '%s\\n' "$visibility" > "$FAKE_GH_VISIBILITY"
+        if [ "$visibility" -le 2 ]; then
+          printf '[[%s]]\\n' "$bot_draft"
+        else
+          printf 'missing\\n' > "$FAKE_GH_STATE"
+          printf '[[]]\\n'
+        fi
         exit 0
       fi
       if [ "$FAKE_GH_SCENARIO" = second-page-draft ]; then
@@ -188,7 +240,27 @@ if [ "$1" = api ]; then
             printf 'fake gh: refusing to delete non-draft release\\n' >&2
             exit 1
           fi
-          printf 'missing\\n' > "$FAKE_GH_STATE"
+          case "$FAKE_GH_SCENARIO" in
+            post-delete-eventually-absent|post-delete-still-visible)
+              printf 'deleting\\n' > "$FAKE_GH_STATE"
+              printf '0\\n' > "$FAKE_GH_VISIBILITY"
+              ;;
+            post-delete-server-error)
+              printf 'deleting-error\\n' > "$FAKE_GH_STATE"
+              ;;
+            post-delete-replaced)
+              printf 'replacement-draft\\n' > "$FAKE_GH_STATE"
+              ;;
+            post-delete-owner-changed)
+              printf 'stale-foreign-draft\\n' > "$FAKE_GH_STATE"
+              ;;
+            post-delete-published)
+              printf 'mutable\\n' > "$FAKE_GH_STATE"
+              ;;
+            *)
+              printf 'missing\\n' > "$FAKE_GH_STATE"
+              ;;
+          esac
           exit 0
           ;;
         PATCH)
@@ -220,6 +292,7 @@ if [ "$1" = release ] && [ "$2" = create ]; then
     exit 1
   fi
   printf 'draft\\n' > "$FAKE_GH_STATE"
+  printf '0\\n' > "$FAKE_GH_VISIBILITY"
   printf 'https://github.com/necofuryai/depatrol/releases/tag/untagged-fake\\n'
   exit 0
 fi
@@ -239,12 +312,18 @@ exit 1
 `;
   writeFileSync(join(bin, "gh"), fakeGh);
   chmodSync(join(bin, "gh"), 0o755);
-  return { root, bin, log, state, bundle };
+  return { root, bin, log, state, visibility, bundle };
 }
 
 function run(data, scenario, immutableAcknowledgement = "true") {
   const initialState = {
     "owned-draft": "draft",
+    "post-delete-eventually-absent": "draft",
+    "post-delete-still-visible": "draft",
+    "post-delete-server-error": "draft",
+    "post-delete-replaced": "draft",
+    "post-delete-owner-changed": "draft",
+    "post-delete-published": "draft",
     "second-page-draft": "draft",
     "foreign-draft": "foreign-draft",
     mutable: "mutable",
@@ -258,6 +337,7 @@ function run(data, scenario, immutableAcknowledgement = "true") {
       PATH: data.bin + ":" + process.env.PATH,
       FAKE_GH_LOG: data.log,
       FAKE_GH_STATE: data.state,
+      FAKE_GH_VISIBILITY: data.visibility,
       FAKE_GH_SCENARIO: scenario,
       GITHUB_REPOSITORY: "necofuryai/depatrol",
       GITHUB_SHA: "0123456789abcdef0123456789abcdef01234567",
@@ -332,6 +412,127 @@ test("replaces only a draft owned by GitHub Actions", () => {
     rmSync(data.root, { recursive: true, force: true });
   }
 });
+
+test("waits for a deleted draft to disappear before recreating it", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "post-delete-eventually-absent");
+    assert.equal(result.status, 0, result.stderr);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(
+      log.match(
+        /api --method DELETE repos\/necofuryai\/depatrol\/releases\/101/g,
+      )?.length,
+      1,
+      log,
+    );
+    assert.equal(log.match(/release create v1\.2\.3/g)?.length, 1, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), ["sleep 1", "sleep 2"]);
+    assert.match(log, /release verify v1\.2\.3/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("stops when a deleted draft remains visible", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "post-delete-still-visible");
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /draft deletion could not be confirmed/);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(
+      log.match(
+        /api --method DELETE repos\/necofuryai\/depatrol\/releases\/101/g,
+      )?.length,
+      1,
+      log,
+    );
+    assert.deepEqual(log.match(/^sleep \d+$/gm), [
+      "sleep 1",
+      "sleep 2",
+      "sleep 4",
+      "sleep 8",
+    ]);
+    assert.doesNotMatch(log, /release create|release upload|api --method PATCH/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("fails immediately when draft inspection errors after deletion", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "post-delete-server-error");
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Server Error/);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(
+      log.match(
+        /api --method DELETE repos\/necofuryai\/depatrol\/releases\/101/g,
+      )?.length,
+      1,
+      log,
+    );
+    assert.doesNotMatch(log, /^sleep /m);
+    assert.doesNotMatch(log, /release create|release upload|api --method PATCH/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("fails immediately when another release appears after deletion", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "post-delete-replaced");
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /release changed while waiting for draft deletion/);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(
+      log.match(
+        /api --method DELETE repos\/necofuryai\/depatrol\/releases\/101/g,
+      )?.length,
+      1,
+      log,
+    );
+    assert.doesNotMatch(log, /^sleep /m);
+    assert.doesNotMatch(log, /release create|release upload|api --method PATCH/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+for (const [scenario, changedField] of [
+  ["post-delete-owner-changed", "owner"],
+  ["post-delete-published", "state"],
+]) {
+  test(`fails immediately when the stale draft ${changedField} changes`, () => {
+    const data = fixture();
+    try {
+      const result = run(data, scenario);
+      assert.equal(result.status, 1);
+      assert.match(
+        result.stderr,
+        /release changed while waiting for draft deletion/,
+      );
+      const log = readFileSync(data.log, "utf8");
+      assert.equal(
+        log.match(
+          /api --method DELETE repos\/necofuryai\/depatrol\/releases\/101/g,
+        )?.length,
+        1,
+        log,
+      );
+      assert.doesNotMatch(log, /^sleep /m);
+      assert.doesNotMatch(
+        log,
+        /release create|release upload|api --method PATCH/,
+      );
+    } finally {
+      rmSync(data.root, { recursive: true, force: true });
+    }
+  });
+}
 
 test("refuses to replace a draft owned by another actor", () => {
   const data = fixture();
@@ -450,8 +651,63 @@ test("stops when a newly-created draft cannot be located", () => {
     assert.equal(result.status, 1);
     assert.match(result.stderr, /failed to locate the created draft/);
     const log = readFileSync(data.log, "utf8");
+    assert.equal(log.match(/release create v1\.2\.3/g)?.length, 1, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), [
+      "sleep 1",
+      "sleep 2",
+      "sleep 4",
+      "sleep 8",
+    ]);
     assert.match(log, /release create v1\.2\.3/);
     assert.doesNotMatch(log, /release upload|api --method PATCH|release verify/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("fails immediately when draft inspection errors after creation", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "post-create-server-error");
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Server Error/);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(log.match(/release create v1\.2\.3/g)?.length, 1, log);
+    assert.doesNotMatch(log, /^sleep /m);
+    assert.doesNotMatch(log, /release upload|api --method PATCH|release verify/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("fails closed when the release visibility wait is interrupted", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "post-create-sleep-error");
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /failed to wait for GitHub Release visibility/);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(log.match(/release create v1\.2\.3/g)?.length, 1, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), ["sleep 1"]);
+    assert.doesNotMatch(log, /release upload|api --method PATCH|release verify/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("waits for a newly-created draft to become visible", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "post-create-eventually-visible");
+    assert.equal(result.status, 0, result.stderr);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(log.match(/release create v1\.2\.3/g)?.length, 1, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), ["sleep 1", "sleep 2"]);
+    assert.match(log, /release upload v1\.2\.3/);
+    assert.match(
+      log,
+      /api --method PATCH repos\/necofuryai\/depatrol\/releases\/101/,
+    );
   } finally {
     rmSync(data.root, { recursive: true, force: true });
   }
