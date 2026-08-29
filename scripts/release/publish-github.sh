@@ -60,6 +60,54 @@ inspect_release() {
   fi
 }
 
+wait_for_release_state() {
+  local expected=$1
+  local stale_release_id=${2:-}
+  local delay
+  local status
+
+  for delay in 0 1 2 4 8; do
+    if [ "$delay" -gt 0 ]; then
+      if ! sleep "$delay"; then
+        echo "release: failed to wait for GitHub Release visibility" \
+          >>"$release_error"
+        return 2
+      fi
+    fi
+
+    status=0
+    inspect_release || status=$?
+    if [ "$status" -eq 2 ]; then
+      return 2
+    fi
+    if [ "$expected" = present ] && [ "$status" -eq 0 ]; then
+      return 0
+    fi
+    if [ "$expected" = absent ] && [ "$status" -eq 1 ]; then
+      return 0
+    fi
+    if [ "$expected" = absent ] && [ "$status" -eq 0 ]; then
+      if [ -z "$stale_release_id" ] || [ "$release_id" != "$stale_release_id" ]; then
+        echo "release changed while waiting for draft deletion" \
+          >>"$release_error"
+        return 2
+      fi
+      if ! jq -e --arg tag "$tag" '
+        .draft == true and
+        .prerelease == false and
+        .author.login == "github-actions[bot]" and
+        .tag_name == $tag
+      ' "$release_json" >/dev/null 2>>"$release_error"; then
+        echo "release changed while waiting for draft deletion" \
+          >>"$release_error"
+        return 2
+      fi
+    fi
+  done
+
+  return 1
+}
+
 load_release_by_id() {
   local expected_id=$1
   local actual_id
@@ -201,8 +249,8 @@ if [ "$release_exists" = true ]; then
     "repos/$repo/releases/$existing_release_id" >/dev/null
 
   release_status=0
-  inspect_release || release_status=$?
-  if [ "$release_status" -ne 1 ]; then
+  wait_for_release_state absent "$existing_release_id" || release_status=$?
+  if [ "$release_status" -ne 0 ]; then
     if [ "$release_status" -eq 2 ]; then
       cat "$release_error" >&2
     fi
@@ -219,7 +267,7 @@ gh release create "$tag" \
   --notes-file "$bundle/release-notes.md"
 
 release_status=0
-inspect_release || release_status=$?
+wait_for_release_state present || release_status=$?
 if [ "$release_status" -ne 0 ]; then
   if [ "$release_status" -eq 2 ]; then
     cat "$release_error" >&2
