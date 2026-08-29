@@ -27,14 +27,15 @@ Forking Renovate App は使わず、標準 Mend-hosted App が target repository
 全 update で automerge を禁止する。
 Pull Request と commit は semantic commit を使い、scope を付けず、DCO sign-off を付ける。
 
-通常の update は月曜日の 06:00 JST より前に確認し、release から 7 日経過した version を対象にする。
-GitHub Actions と Go toolchain は平日に確認し、release から 1 日経過した version を対象にする。
+通常 update の `schedule` は `"at any time"` を明示し、Mend の organization 設定を継承しても狭い時間枠で制限しない。
+Mend-hosted Community の job 実行時刻と queue 遅延は repository から予約できず、時間枠を設定すると job が成功しても branch 作成をスキップするためである。
+通常の update は release から 7 日、GitHub Actions と Go toolchain は 1 日経過した後、次の Mend job で Pull Request 作成対象にする。
 Go は最新 stable を優先し、major 相当の更新でも Dashboard approval を待たずに Pull Request を作成する。
 Automerge は行わないため、最終判断は maintainer review に残る。
 
 Go module と GitHub Actions の non-major update は、それぞれ一つの Pull Request にまとめる。
 一般 dependency の major update、release workflow の変更、GoReleaser と npm CLI の更新は Dependency Dashboard で作成を承認する。
-脆弱性修正は通常 schedule と minimum release age を待たず、`security` label を付ける。
+脆弱性修正は minimum release age を待たず、`security` label を付ける。
 
 ## Installation order
 
@@ -68,13 +69,15 @@ Re-run で一時障害かを確認し、再現する場合は dependency change 
 Dependabot alert または Renovate vulnerability Pull Request を検知したら、影響 package、severity、到達可能性、fix version を確認する。
 Go dependency は `govulncheck` の symbol-level result も確認する。
 
-Fix が利用可能な場合は schedule を待たずに Pull Request を review する。
+Fix が利用可能な場合は Pull Request を速やかに review する。
 Fix がない場合は exposure、runtime path、temporary mitigation を issue または security advisory に記録する。
 Public issue に未公開 vulnerability detail や credential を書かない。
 
 ## Routine checks
 
 毎週、Dependency Dashboard で rate limit、pending major update、stale branch、設定 error を確認する。
+Mend Developer Portal では、最後の job の開始時刻、完了時刻、status も確認する。
+長時間 pending の job や実行間隔の欠落を repository 設定の schedule 待ちと混同しない。
 最初の 2 update cycle では次を観測する。
 
 - `go.mod`、`tools/go.mod`、`.node-version`、GitHub Actions、GoReleaser、npm CLI が検出される。
