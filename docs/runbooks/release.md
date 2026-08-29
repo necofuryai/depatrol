@@ -2,7 +2,7 @@
 
 [ADR 0006](../decisions/0006-distribution.md) と [ADR 0007](../decisions/0007-build-once-immutable-release.md) の運用手順を定める。
 配布 channel の選択は ADR 0006、release integrity と retry 境界は ADR 0007 を正とする。
-Version と外部サービスの仕様は 2026-08-10 に確認した。
+Version と外部サービスの仕様は 2026-08-29 に確認した。
 
 ## Pipeline
 
