@@ -36,7 +36,7 @@ Release build は `--skip=publish` を必須とし、明示した ldflags で ve
 
 | 対象 | version | 固定方法 |
 |---|---:|---|
-| Go | `1.26.5` | `go.mod` |
+| Go | `1.27.0` | `go.mod` |
 | Node.js | `24.19.0` | `.node-version` |
 | npm CLI | `11.19.0` | workflow 内の exact version |
 | GoReleaser | `v2.17.1` | workflow 内の exact version |
@@ -44,7 +44,7 @@ Release build は `--skip=publish` を必須とし、明示した ldflags で ve
 | govulncheck | `v1.6.0` | `tools/go.mod` |
 
 Go は最新 stable を追従する。
-Renovate は Go toolchain を平日に確認し、release から 1 日後に更新 Pull Request を作成する。
+Renovate は、Go toolchain の release から 1 日経過した後、次の Mend job で更新 Pull Request の作成対象にする。
 CI は `actions/setup-go` が `go.mod` を読み、local Mac の mise 設定には依存しない。
 
 Workflow で使う action は full commit SHA に固定する。

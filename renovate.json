@@ -9,8 +9,7 @@
   ],
   "baseBranchPatterns": ["$default"],
   "enabledManagers": ["gomod", "github-actions", "nodenv", "custom.regex"],
-  "timezone": "Asia/Tokyo",
-  "schedule": ["before 6am on monday"],
+  "schedule": ["at any time"],
   "minimumReleaseAge": "7 days",
   "prConcurrentLimit": 4,
   "prHourlyLimit": 2,
@@ -37,7 +36,6 @@
       "matchDepNames": ["go"],
       "matchDepTypes": ["golang"],
       "rangeStrategy": "bump",
-      "schedule": ["before 6am every weekday"],
       "minimumReleaseAge": "1 day",
       "dependencyDashboardApproval": false,
       "automerge": false
@@ -62,9 +60,8 @@
       "automerge": false
     },
     {
-      "description": "Check SHA-pinned GitHub Actions on weekdays",
+      "description": "Track SHA-pinned GitHub Actions promptly",
       "matchManagers": ["github-actions"],
-      "schedule": ["before 6am every weekday"],
       "minimumReleaseAge": "1 day"
     },
     {
