@@ -2,7 +2,8 @@
 
 [ADR 0006](../decisions/0006-distribution.md) と [ADR 0007](../decisions/0007-build-once-immutable-release.md) の運用手順を定める。
 配布 channel の選択は ADR 0006、release integrity と retry 境界は ADR 0007 を正とする。
-Version と外部サービスの仕様は 2026-08-29 に確認した。
+外部サービスの仕様は 2026-08-29 に確認した。
+固定 version は 2026-09-05 に確認した。
 
 ## Pipeline
 
@@ -36,10 +37,10 @@ Release build は `--skip=publish` を必須とし、明示した ldflags で ve
 
 | 対象 | version | 固定方法 |
 |---|---:|---|
-| Go | `1.27.0` | `go.mod` |
-| Node.js | `24.19.0` | `.node-version` |
+| Go | `1.27.1` | `go.mod` |
+| Node.js | `24.20.0` | `.node-version` |
 | npm CLI | `11.19.0` | workflow 内の exact version |
-| GoReleaser | `v2.17.1` | workflow 内の exact version |
+| GoReleaser | `v2.18.0` | workflow 内の exact version |
 | actionlint | `v1.7.12` | `tools/go.mod` |
 | govulncheck | `v1.7.0` | `tools/go.mod` |
 
