@@ -59,7 +59,7 @@ Run the repository validation before pushing. The application Go version comes f
 bash scripts/ci/verify.sh
 ```
 
-Changes to release configuration, npm packaging, or release scripts must also pass the publish-free preflight. Use the exact Node.js, npm, and GoReleaser versions listed in the [release runbook](docs/runbooks/release.md); CI remains the authoritative pinned environment.
+Changes to release configuration, npm packaging, or release scripts must also pass the publish-free preflight. Use the Node.js version in `.node-version` and the exact npm and GoReleaser versions listed in the [release runbook](docs/runbooks/release.md); CI remains the authoritative pinned environment.
 
 ```console
 bash scripts/release/preflight.sh

@@ -33,20 +33,21 @@ Artifact は 30 日保持し、同名 upload の上書きを禁止する。
 GoReleaser の publisher は [.goreleaser.yaml](../../.goreleaser.yaml) で無効化する。
 Release build は `--skip=publish` を必須とし、明示した ldflags で version、full commit、commit date を埋め込む。
 
-Release 手順で operator が手で有効化する version は次のとおりである。
+次の tool は workflow 内の literal で固定する。
+Local に読ませる file がないため、operator が version を指定して有効化する。
 
 | 対象 | version | 固定方法 |
 |---|---:|---|
-| Node.js | `24.21.0` | `.node-version` |
 | npm CLI | `11.19.0` | workflow 内の exact version |
 | GoReleaser | `v2.18.0` | workflow 内の exact version |
 
-次の tool は toolchain が固定元を直接読むため、operator が version を指定する場面がない。
-ここに version を転記しない。
+次の tool は file で固定する。
+Toolchain がその file を直接読むため、ここに version を転記しない。
 
 | 対象 | 固定元 | 取得方法 |
 |---|---|---|
 | Go | `go.mod` | `actions/setup-go` の `go-version-file` |
+| Node.js | `.node-version` | `actions/setup-node` の `node-version-file`、local は `.node-version` を読む toolchain manager |
 | actionlint | `tools/go.mod` | `scripts/ci/verify.sh` が build |
 | govulncheck | `tools/go.mod` | `scripts/ci/verify.sh` が build |
 
@@ -54,7 +55,7 @@ Go は最新 stable を追従する。
 Renovate は、Go toolchain の release から 1 日経過した後、次の Mend job で更新 Pull Request の作成対象にする。
 CI は `actions/setup-go` が `go.mod` を読み、local Mac の mise 設定には依存しない。
 
-表の version は release を実行する側の pin であり、npm パッケージが利用者に要求する Node の下限とは別である。
+`.node-version` の Node.js は release を実行する側の pin であり、npm パッケージが利用者に要求する Node の下限とは別である。
 下限は「npm package layout」に記録する。
 `packaging/npm/publish.mjs` は OIDC trusted publishing の要件として npm `11.5.1` 以上を実行時に検証する。
 表の npm CLI version はこの下限を満たす exact version である。
@@ -125,7 +126,7 @@ Hardening 導入前の commit には guard 自体が存在しない。
 1. Release 対象を merge した Pull Request で `test`、`dependency-review`、`release-preflight` が green だったことを確認する。
    `main` push では PR 専用の `dependency-review` は skip されるため、`main` 上では `test` と `release-preflight` の成功を確認する。
 2. Local の `main` を `origin/main` に fast-forward し、release 対象 commit を固定する。
-3. 表に記載した exact Node.js、npm、GoReleaser を有効にし、CI と同じ検証を local でも実行する。
+3. `.node-version` の Node.js と、表に記載した exact npm、GoReleaser を有効にし、CI と同じ検証を local でも実行する。
 
    ```console
    bash scripts/ci/verify.sh
