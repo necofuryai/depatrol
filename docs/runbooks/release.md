@@ -3,7 +3,7 @@
 [ADR 0006](../decisions/0006-distribution.md) と [ADR 0007](../decisions/0007-build-once-immutable-release.md) の運用手順を定める。
 配布 channel の選択は ADR 0006、release integrity と retry 境界は ADR 0007 を正とする。
 外部サービスの仕様は 2026-08-29 に確認した。
-固定 version は 2026-09-05 に確認した。
+固定 version は 2026-09-20 に確認した。
 
 ## Pipeline
 
@@ -33,16 +33,22 @@ Artifact は 30 日保持し、同名 upload の上書きを禁止する。
 GoReleaser の publisher は [.goreleaser.yaml](../../.goreleaser.yaml) で無効化する。
 Release build は `--skip=publish` を必須とし、明示した ldflags で version、full commit、commit date を埋め込む。
 
-現在の固定 version は次のとおりである。
+Release 手順で operator が手で有効化する version は次のとおりである。
 
 | 対象 | version | 固定方法 |
 |---|---:|---|
-| Go | `1.27.1` | `go.mod` |
 | Node.js | `24.21.0` | `.node-version` |
 | npm CLI | `11.19.0` | workflow 内の exact version |
 | GoReleaser | `v2.18.0` | workflow 内の exact version |
-| actionlint | `v1.7.12` | `tools/go.mod` |
-| govulncheck | `v1.8.0` | `tools/go.mod` |
+
+次の tool は toolchain が固定元を直接読むため、operator が version を指定する場面がない。
+ここに version を転記しない。
+
+| 対象 | 固定元 | 取得方法 |
+|---|---|---|
+| Go | `go.mod` | `actions/setup-go` の `go-version-file` |
+| actionlint | `tools/go.mod` | `scripts/ci/verify.sh` が build |
+| govulncheck | `tools/go.mod` | `scripts/ci/verify.sh` が build |
 
 Go は最新 stable を追従する。
 Renovate は、Go toolchain の release から 1 日経過した後、次の Mend job で更新 Pull Request の作成対象にする。
