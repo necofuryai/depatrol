@@ -38,7 +38,7 @@ Release build は `--skip=publish` を必須とし、明示した ldflags で ve
 | 対象 | version | 固定方法 |
 |---|---:|---|
 | Go | `1.27.1` | `go.mod` |
-| Node.js | `24.20.0` | `.node-version` |
+| Node.js | `24.21.0` | `.node-version` |
 | npm CLI | `11.19.0` | workflow 内の exact version |
 | GoReleaser | `v2.18.0` | workflow 内の exact version |
 | actionlint | `v1.7.12` | `tools/go.mod` |
