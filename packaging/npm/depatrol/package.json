@@ -23,7 +23,7 @@
     "bin"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "optionalDependencies": {
     "@depatrol/cli-darwin-arm64": "0.0.0-managed",

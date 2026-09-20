@@ -48,6 +48,11 @@ Go は最新 stable を追従する。
 Renovate は、Go toolchain の release から 1 日経過した後、次の Mend job で更新 Pull Request の作成対象にする。
 CI は `actions/setup-go` が `go.mod` を読み、local Mac の mise 設定には依存しない。
 
+表の version は release を実行する側の pin であり、npm パッケージが利用者に要求する Node の下限とは別である。
+下限は「npm package layout」に記録する。
+`packaging/npm/publish.mjs` は OIDC trusted publishing の要件として npm `11.5.1` 以上を実行時に検証する。
+表の npm CLI version はこの下限を満たす exact version である。
+
 Workflow で使う action は full commit SHA に固定する。
 
 | action | tag | commit SHA |
@@ -216,6 +221,11 @@ Main package は `depatrol`、platform package は `@depatrol/cli-{darwin-arm64,
 Platform package は `os` と `cpu` を宣言し、main package の `optionalDependencies` は同じ exact version に固定する。
 Lifecycle script は使用しない。
 CGO を無効にしているため musl variant は持たない。
+
+Main package の `engines.node` は、nodejs/Release で maintenance が継続している最古の Node 系統を下限とする。
+現在の下限は `>=22` であり、Node.js 22 の end-of-life は 2027-04-30 である。
+Platform package には `engines` を宣言しない。
+npm では optionalDependency が engines 不一致で警告なく skip されるため、宣言すると engine 不一致が「platform package が見つからない」という別の失敗として利用者に見える。
 
 既存 6 package は bootstrap 済みであり、現在は trusted publishing を使う。
 新しい package を追加する場合だけ、短命な granular token で stub version を作成し、trusted publisher 登録後に token を失効させる。

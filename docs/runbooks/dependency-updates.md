@@ -23,6 +23,12 @@ Forking Renovate App は使わず、標準 Mend-hosted App が target repository
 `baseBranchPatterns` は `"$default"` を明示し、Mend の organization 設定を継承しても GitHub の default branch を使う。
 `npm` manager は有効化しない。
 `packaging/npm/depatrol/package.json` の version は release 時に生成する placeholder であり、dependency update の対象ではない。
+同じファイルの `engines.node` も Renovate の対象外とする。
+Renovate は `engines.node` を `node-version` datasource として抽出できる。
+ただし既定の `rangeStrategy` は、新しい version が `>=22` を満たす限り値を書き換えない。
+値の変わらない update は破棄されるため、Pull Request は作られない。
+`rangeStrategy` を `bump` にすると最新 stable の full version を提案し、「maintenance が継続している最古の Node 系統」という下限の規則とは逆の値になる。
+下限は [release runbook](release.md) の規則に従って手動で見直す。
 
 全 update で automerge を禁止する。
 Pull Request と commit は semantic commit を使い、scope を付けず、DCO sign-off を付ける。
