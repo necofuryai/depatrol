@@ -22,10 +22,12 @@ function fixture() {
   const log = join(root, "gh.log");
   const state = join(root, "release-state");
   const visibility = join(root, "release-visibility");
+  const attestation = join(root, "release-attestation");
   const bundle = join(root, "bundle");
   mkdirSync(bin);
   mkdirSync(bundle);
   writeFileSync(visibility, "0\n");
+  writeFileSync(attestation, "0\n");
 
   writeFileSync(
     join(bundle, "release-manifest.json"),
@@ -56,7 +58,8 @@ exit 0
     `#!/bin/sh
 set -eu
 printf 'sleep %s\\n' "$*" >> "$FAKE_GH_LOG"
-if [ "$FAKE_GH_SCENARIO" = post-create-sleep-error ]; then
+if [ "$FAKE_GH_SCENARIO" = post-create-sleep-error ] ||
+  [ "$FAKE_GH_SCENARIO" = attestation-sleep-error ]; then
   printf 'fake sleep: interrupted\\n' >&2
   exit 1
 fi
@@ -304,6 +307,44 @@ fi
 
 if [ "$1" = release ] && [ "$2" = verify ]; then
   [ "$state" = immutable ]
+  attempts=$(cat "$FAKE_GH_ATTESTATION")
+  attempts=$((attempts + 1))
+  printf '%s\\n' "$attempts" > "$FAKE_GH_ATTESTATION"
+  # gh prints this line on stderr for every failure to load the release
+  # attestation, including before GitHub serves it.
+  missing='no attestations for tag v1.2.3 (sha1:abcdefabcdefabcdefabcdefabcdefabcdefabcd)'
+  case "$FAKE_GH_SCENARIO" in
+    attestation-eventually-available|immutable-attestation-eventually-available)
+      if [ "$attempts" -le 2 ]; then
+        printf '%s\\n' "$missing" >&2
+        exit 1
+      fi
+      ;;
+    attestation-never-available|attestation-sleep-error|immutable-attestation-never-available)
+      printf '%s\\n' "$missing" >&2
+      exit 1
+      ;;
+    attestation-verify-error|immutable-attestation-verify-error)
+      printf 'failed to verify attestations for tag v1.2.3: subject digest mismatch\\n' >&2
+      exit 1
+      ;;
+    attestation-pending-then-error)
+      if [ "$attempts" -le 1 ]; then
+        printf '%s\\n' "$missing" >&2
+      else
+        printf 'failed to verify attestations for tag v1.2.3: subject digest mismatch\\n' >&2
+      fi
+      exit 1
+      ;;
+    attestation-other-tag)
+      printf 'no attestations for tag v1.2.30 (sha1:abcdefabcdefabcdefabcdefabcdefabcdefabcd)\\n' >&2
+      exit 1
+      ;;
+    attestation-silent-error)
+      exit 1
+      ;;
+  esac
+  printf 'Release v1.2.3 verified!\\n'
   exit 0
 fi
 
@@ -312,7 +353,7 @@ exit 1
 `;
   writeFileSync(join(bin, "gh"), fakeGh);
   chmodSync(join(bin, "gh"), 0o755);
-  return { root, bin, log, state, visibility, bundle };
+  return { root, bin, log, state, visibility, attestation, bundle };
 }
 
 function run(data, scenario, immutableAcknowledgement = "true") {
@@ -328,6 +369,9 @@ function run(data, scenario, immutableAcknowledgement = "true") {
     "foreign-draft": "foreign-draft",
     mutable: "mutable",
     immutable: "immutable",
+    "immutable-attestation-eventually-available": "immutable",
+    "immutable-attestation-never-available": "immutable",
+    "immutable-attestation-verify-error": "immutable",
   }[scenario] ?? "missing";
   writeFileSync(data.state, initialState + "\n");
   return spawnSync("/bin/bash", [publishScript, "v1.2.3", data.bundle], {
@@ -338,6 +382,7 @@ function run(data, scenario, immutableAcknowledgement = "true") {
       FAKE_GH_LOG: data.log,
       FAKE_GH_STATE: data.state,
       FAKE_GH_VISIBILITY: data.visibility,
+      FAKE_GH_ATTESTATION: data.attestation,
       FAKE_GH_SCENARIO: scenario,
       GITHUB_REPOSITORY: "necofuryai/depatrol",
       GITHUB_SHA: "0123456789abcdef0123456789abcdef01234567",
@@ -352,6 +397,13 @@ function assertNoReleaseMutation(log) {
     /api --method (?:DELETE|PATCH) repos\/necofuryai\/depatrol\/releases\/|release (?:create|upload)/,
   );
 }
+
+function countMatches(text, pattern) {
+  return text.match(pattern)?.length ?? 0;
+}
+
+const releaseVerifyCall = /^release verify v1\.2\.3 --repo necofuryai\/depatrol$/gm;
+const remoteTagLookup = "api repos/necofuryai/depatrol/git/ref/tags/v1.2.3";
 
 test("publishes a new draft without reading it from the published tag endpoint", () => {
   const data = fixture();
@@ -725,6 +777,192 @@ test("stops when GitHub publishes the release as mutable", () => {
       /api --method PATCH repos\/necofuryai\/depatrol\/releases\/101/,
     );
     assert.doesNotMatch(log, /release verify/);
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("waits for the release attestation after publishing", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "attestation-eventually-available");
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stderr,
+      /release: GitHub Release attestation for v1\.2\.3 is not available yet/,
+    );
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(countMatches(log, releaseVerifyCall), 3, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), ["sleep 1", "sleep 2"]);
+    assert.equal(
+      countMatches(
+        log,
+        /api --method PATCH repos\/necofuryai\/depatrol\/releases\/101/g,
+      ),
+      1,
+      log,
+    );
+    assert.equal(countMatches(log, /^release create /gm), 1, log);
+    assert.ok(
+      log.lastIndexOf(remoteTagLookup) > log.lastIndexOf("release verify v1.2.3"),
+      log,
+    );
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("stops when the release attestation never becomes available", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "attestation-never-available");
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /no attestations for tag v1\.2\.3 \(sha1:[0-9a-f]{40}\)/,
+    );
+    assert.match(
+      result.stderr,
+      /release: GitHub Release attestation did not become available/,
+    );
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(countMatches(log, releaseVerifyCall), 7, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), [
+      "sleep 1",
+      "sleep 2",
+      "sleep 4",
+      "sleep 8",
+      "sleep 16",
+      "sleep 32",
+    ]);
+    assert.equal(countMatches(log, /api --method PATCH/g), 1, log);
+    assert.equal(countMatches(log, /^release create /gm), 1, log);
+    assertNoReleaseMutation(log.slice(log.indexOf("release verify v1.2.3")));
+    assert.ok(
+      log.lastIndexOf(remoteTagLookup) < log.indexOf("release verify v1.2.3"),
+      log,
+    );
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+for (const [scenario, message] of [
+  ["attestation-verify-error", /subject digest mismatch/],
+  ["attestation-other-tag", /no attestations for tag v1\.2\.30 /],
+  ["attestation-silent-error", null],
+]) {
+  test(`fails immediately when release attestation verification fails: ${scenario}`, () => {
+    const data = fixture();
+    try {
+      const result = run(data, scenario);
+      assert.equal(result.status, 1);
+      if (message) {
+        assert.match(result.stderr, message);
+      }
+      assert.match(
+        result.stderr,
+        /release: GitHub Release attestation verification failed/,
+      );
+      assert.doesNotMatch(
+        result.stderr,
+        /is not available yet|did not become available/,
+      );
+      const log = readFileSync(data.log, "utf8");
+      assert.equal(countMatches(log, releaseVerifyCall), 1, log);
+      assert.doesNotMatch(log, /^sleep /m);
+      assertNoReleaseMutation(log.slice(log.indexOf("release verify v1.2.3")));
+    } finally {
+      rmSync(data.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("stops waiting when a pending attestation turns into another failure", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "attestation-pending-then-error");
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /subject digest mismatch/);
+    assert.match(
+      result.stderr,
+      /release: GitHub Release attestation verification failed/,
+    );
+    assert.doesNotMatch(result.stderr, /did not become available/);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(countMatches(log, releaseVerifyCall), 2, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), ["sleep 1"]);
+    assertNoReleaseMutation(log.slice(log.indexOf("release verify v1.2.3")));
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+for (const [scenario, verifyCalls, sleeps, message] of [
+  [
+    "immutable-attestation-never-available",
+    7,
+    ["sleep 1", "sleep 2", "sleep 4", "sleep 8", "sleep 16", "sleep 32"],
+    /release: GitHub Release attestation did not become available/,
+  ],
+  [
+    "immutable-attestation-verify-error",
+    1,
+    null,
+    /release: GitHub Release attestation verification failed/,
+  ],
+]) {
+  test(`fails closed when re-verifying a published release: ${scenario}`, () => {
+    const data = fixture();
+    try {
+      const result = run(data, scenario, "");
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, message);
+      const log = readFileSync(data.log, "utf8");
+      assert.equal(countMatches(log, releaseVerifyCall), verifyCalls, log);
+      assert.deepEqual(log.match(/^sleep \d+$/gm), sleeps);
+      assertNoReleaseMutation(log);
+      assert.ok(
+        log.lastIndexOf(remoteTagLookup) < log.indexOf("release verify v1.2.3"),
+        log,
+      );
+    } finally {
+      rmSync(data.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("fails closed when the release attestation wait is interrupted", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "attestation-sleep-error");
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /release: failed to wait for the GitHub Release attestation/,
+    );
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(countMatches(log, releaseVerifyCall), 1, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), ["sleep 1"]);
+    assertNoReleaseMutation(log.slice(log.indexOf("release verify v1.2.3")));
+  } finally {
+    rmSync(data.root, { recursive: true, force: true });
+  }
+});
+
+test("waits for the release attestation when re-verifying a published release", () => {
+  const data = fixture();
+  try {
+    const result = run(data, "immutable-attestation-eventually-available", "");
+    assert.equal(result.status, 0, result.stderr);
+    const log = readFileSync(data.log, "utf8");
+    assert.equal(countMatches(log, releaseVerifyCall), 3, log);
+    assert.deepEqual(log.match(/^sleep \d+$/gm), ["sleep 1", "sleep 2"]);
+    assertNoReleaseMutation(log);
+    assert.ok(
+      log.lastIndexOf(remoteTagLookup) > log.lastIndexOf("release verify v1.2.3"),
+      log,
+    );
   } finally {
     rmSync(data.root, { recursive: true, force: true });
   }

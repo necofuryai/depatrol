@@ -13,6 +13,7 @@ trap 'rm -rf "$release_tmp"' EXIT
 release_pages="$release_tmp/releases.json"
 release_json="$release_tmp/release.json"
 release_error="$release_tmp/release.error"
+attestation_error="$release_tmp/attestation.error"
 asset_names="$release_tmp/asset-names.txt"
 release_id=""
 release_exists=false
@@ -193,6 +194,50 @@ validate_published_release() {
   fi
 }
 
+# GitHub signs the release attestation as it publishes an immutable release,
+# but the attestations API can lag behind. gh reports every failure to load
+# the attestation as "no attestations for tag <tag> (...)": none served yet,
+# an HTTP error from the attestations API, or a bundle fetch or parse error.
+# Only that message is waited out: the check is read-only, so a retry can
+# delay a failure but never accept an unverified release.
+verify_release_attestation() {
+  local delay
+  local line
+  local pending
+  local status
+
+  for delay in 0 1 2 4 8 16 32; do
+    if [ "$delay" -gt 0 ]; then
+      if ! sleep "$delay"; then
+        echo "release: failed to wait for the GitHub Release attestation" >&2
+        return 1
+      fi
+    fi
+
+    status=0
+    gh release verify "$tag" --repo "$repo" 2>"$attestation_error" || status=$?
+    cat "$attestation_error" >&2
+    if [ "$status" -eq 0 ]; then
+      return 0
+    fi
+
+    pending=false
+    while IFS= read -r line || [ -n "$line" ]; do
+      case $line in
+        "no attestations for tag $tag ("*) pending=true ;;
+      esac
+    done <"$attestation_error"
+    if [ "$pending" != true ]; then
+      echo "release: GitHub Release attestation verification failed" >&2
+      return 1
+    fi
+    echo "release: GitHub Release attestation for $tag is not available yet" >&2
+  done
+
+  echo "release: GitHub Release attestation did not become available" >&2
+  return 1
+}
+
 release_status=0
 inspect_release || release_status=$?
 if [ "$release_status" -eq 0 ]; then
@@ -214,7 +259,9 @@ if [ "$release_status" -eq 0 ]; then
     fi
     node scripts/release/artifacts.mjs verify-release \
       "$bundle" "$release_json" published
-    gh release verify "$tag" --repo "$repo"
+    if ! verify_release_attestation; then
+      exit 1
+    fi
     bash scripts/release/verify-remote-tag.sh "$tag" "$GITHUB_SHA"
     exit 0
   fi
@@ -341,5 +388,7 @@ if ! validate_published_release; then
 fi
 node scripts/release/artifacts.mjs verify-release \
   "$bundle" "$release_json" published
-gh release verify "$tag" --repo "$repo"
+if ! verify_release_attestation; then
+  exit 1
+fi
 bash scripts/release/verify-remote-tag.sh "$tag" "$GITHUB_SHA"
