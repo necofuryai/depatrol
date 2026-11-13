@@ -181,6 +181,13 @@ Draft は tag-name endpoint の取得対象外である。
 公開前の検出には全ページを取得した Releases 一覧を使い、再検証と公開には一覧で確定した release ID を使う。
 Draft の作成・削除直後だけは、一覧への反映を上限付き backoff で待つ。
 API error、malformed response、duplicate、release ID、state、owner、tag の不一致は retry せず停止する。
+公開済み release の `gh release verify` だけは例外とし、`no attestations for tag` を返す間を上限付き backoff で待つ。
+GitHub は公開とほぼ同時に release attestation に署名するが、attestations API から取得できるまでに遅れることがある。
+gh は attestations API の HTTP error と、attestation bundle の取得や解析の失敗も同じ表示にまとめるため、これらも同じ上限まで待つ。
+この待機は read-only な検証を繰り返すだけなので、失敗を遅らせることはあっても、未検証の release を成功扱いにすることはない。
+Tag の解決失敗を含め、`gh release verify` のそれ以外の失敗は待たずに停止する。
+上限を超えて停止した場合は、公開済みの immutable release を `Re-run failed jobs` で再検証する。
+再実行でも同じように停止する場合は、反映の遅れではなく attestations API の障害が考えられるため、再実行を重ねる前に原因を調べる。
 Tag-name endpoint は、公開後に同じ release ID を返すことの検証にだけ使う。
 
 ## npm publish and retry
