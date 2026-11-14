@@ -43,6 +43,14 @@ Go module と GitHub Actions の non-major update は、それぞれ一つの Pu
 一般 dependency の major update、release workflow の変更、GoReleaser と npm CLI の更新は Dependency Dashboard で作成を承認する。
 脆弱性修正は minimum release age を待たず、`security` label を付ける。
 
+`.node-version` の Node.js は Dependabot alerts の対象外であり、その security release は Renovate の vulnerability Pull Request にならない。
+そのため通常の update と同じく minimum release age を待ち、Dependency Dashboard の Pending Status Checks に留まる。
+Dashboard の項目は Pull Request の title しか示さないため、Node.js の update が security release かは Node.js の release notes で確認する。
+Security release であれば、maintainer が Dashboard の該当 checkbox を選択し、minimum release age を待たずに Pull Request を作成させる。
+こうして作成した Pull Request には `security` label が付かず、`renovate/stability-days` は minimum release age を満たすまで pending のままになる。
+この check は required checks に含まれないため、pending のままでも merge を妨げない。
+Merge は他の update と同じく Review procedure の全手順で判断し、Node.js の変更に求められる release runbook の確認も省かない。
+
 ## Installation order
 
 1. GitHub Dependency graph と Dependabot alerts を有効化する。
@@ -82,6 +90,7 @@ Public issue に未公開 vulnerability detail や credential を書かない。
 ## Routine checks
 
 毎週、Dependency Dashboard で rate limit、pending major update、stale branch、設定 error を確認する。
+Pending Status Checks に Node.js の update が留まっていれば、Renovate policy の手順で security release かを確認する。
 Mend Developer Portal では、最後の job の開始時刻、完了時刻、status も確認する。
 長時間 pending の job や実行間隔の欠落を repository 設定の schedule 待ちと混同しない。
 最初の 2 update cycle では次を観測する。
