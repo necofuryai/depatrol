@@ -1,0 +1,41 @@
+{
+  "name": "depatrol",
+  "version": "0.2.0",
+  "description": "Read-only control plane for Dependabot across GitHub repositories",
+  "keywords": [
+    "dependabot",
+    "dependencies",
+    "supply-chain",
+    "cli"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/necofuryai/depatrol.git"
+  },
+  "homepage": "https://github.com/necofuryai/depatrol#readme",
+  "bugs": "https://github.com/necofuryai/depatrol/issues",
+  "type": "module",
+  "bin": {
+    "depatrol": "./dist/depatrol.js"
+  },
+  "files": [
+    "dist/depatrol.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outfile dist/depatrol.js --target node --format esm --banner='#!/usr/bin/env node'",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.1"
+  }
+}
