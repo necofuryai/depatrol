@@ -5,10 +5,10 @@
     "": {
       "name": "depatrol",
       "devDependencies": {
-        "@types/bun": "^1.4.4",
-        "@types/node": "^26.6.6",
-        "typescript": "^7.0.2",
-        "yaml": "^2.9.1",
+        "@types/bun": "1.4.4",
+        "@types/node": "26.6.6",
+        "typescript": "7.0.2",
+        "yaml": "2.9.1",
       },
     },
   },
