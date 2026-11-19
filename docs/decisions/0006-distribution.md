@@ -1,6 +1,6 @@
 # 0006. 配布はタグ起点とし、4 チャネルを段階導入する
 
-- ステータス: 一部置換（release integrity に関する決定 1〜3 は [ADR 0007](0007-build-once-immutable-release.md) を優先する）
+- ステータス: 置換予定（v0.1.x の release integrity は [ADR 0007](0007-build-once-immutable-release.md)、v0.2.0 以降の配布契約は [ADR 0009](0009-single-npm-package-release.md) を優先する）
 - 日付: 2026-08-01
 
 ## 背景

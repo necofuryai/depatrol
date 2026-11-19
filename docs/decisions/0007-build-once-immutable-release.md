@@ -1,6 +1,6 @@
 # 0007. Release は一度だけ build し、検証済みの同一成果物を配布する
 
-- ステータス: 採択
+- ステータス: 置換予定（v0.1.x のリリースおよび既存 baseline 検証に適用。v0.2.0 以降の単一 npm パッケージ配布は [ADR 0009](0009-single-npm-package-release.md) が build-once / immutable release 原則を継承し置き換える）
 - 日付: 2026-08-10
 - 置換対象: ADR 0006 の決定 1〜3
 
