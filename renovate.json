@@ -8,7 +8,13 @@
     ":semanticCommitScopeDisabled"
   ],
   "baseBranchPatterns": ["$default"],
-  "enabledManagers": ["gomod", "github-actions", "nodenv", "custom.regex"],
+  "enabledManagers": [
+    "bun",
+    "bun-version",
+    "nodenv",
+    "github-actions",
+    "custom.regex"
+  ],
   "schedule": ["at any time"],
   "minimumReleaseAge": "7 days",
   "prConcurrentLimit": 4,
@@ -23,7 +29,6 @@
     "labels": ["security"],
     "minimumReleaseAge": null
   },
-  "postUpdateOptions": ["gomodTidy"],
   "packageRules": [
     {
       "description": "Require approval before major update PR creation",
@@ -31,21 +36,17 @@
       "dependencyDashboardApproval": true
     },
     {
-      "description": "Track the latest stable Go toolchain promptly",
-      "matchManagers": ["gomod"],
-      "matchDepNames": ["go"],
-      "matchDepTypes": ["golang"],
-      "rangeStrategy": "bump",
-      "minimumReleaseAge": "1 day",
-      "dependencyDashboardApproval": false,
-      "automerge": false
+      "description": "Keep engines.node floor manual per release runbook",
+      "matchManagers": ["bun"],
+      "matchDepTypes": ["engines"],
+      "enabled": false
     },
     {
-      "description": "Group non-major direct Go module updates",
-      "matchManagers": ["gomod"],
-      "matchDepTypes": ["require"],
+      "description": "Group non-major devDependency updates",
+      "matchManagers": ["bun"],
+      "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "Go module dependencies"
+      "groupName": "devDependencies"
     },
     {
       "description": "Keep release workflow changes manual",
@@ -54,7 +55,7 @@
       "automerge": false
     },
     {
-      "description": "Keep custom release tool updates manual",
+      "description": "Keep custom release and CI tool updates manual",
       "matchManagers": ["custom.regex"],
       "dependencyDashboardApproval": true,
       "automerge": false
@@ -74,22 +75,22 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update GoReleaser version",
-      "managerFilePatterns": [
-        "/^\\.github/workflows\\/(?:ci|release)\\.yml$/"
-      ],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+version: (?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
-      ]
-    },
-    {
-      "customType": "regex",
       "description": "Update npm CLI version used for release",
       "managerFilePatterns": [
         "/^\\.github/workflows\\/(?:ci|release)\\.yml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+- run: npm install -g npm@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update actionlint version used in CI and release validation",
+      "managerFilePatterns": [
+        "/^\\.github/workflows\\/(?:ci|release)\\.yml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) versioning=(?<versioning>\\S+)\\s+ACTIONLINT_VERSION: (?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ]
     }
   ]

@@ -5,10 +5,10 @@
 /.github/release-baselines.json @necofuryai
 /.github/release-hardening-baseline @necofuryai
 /.github/release-keys/ @necofuryai
+/.bun-version @necofuryai
 /.node-version @necofuryai
-/.goreleaser.yaml @necofuryai
-/packaging/npm/ @necofuryai
+/bun.lock @necofuryai
+/package.json @necofuryai
 /renovate.json @necofuryai
 /scripts/ci/ @necofuryai
 /scripts/release/ @necofuryai
-/tools/ @necofuryai

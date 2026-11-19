@@ -53,19 +53,22 @@ The sign-off asserts you have the right to submit the change under the project l
 
 ### Before you push
 
-Run the repository validation before pushing. The application Go version comes from `go.mod`; pinned Go-based development tools live in the isolated `tools` module so their dependencies cannot alter the application module graph.
+depatrol is implemented in TypeScript and uses Bun for development, testing, and bundling, while keeping the built CLI compatible with Node.js 22+ and Bun ([ADR 0008](docs/decisions/0008-typescript-bun-stack.md), [ADR 0009](docs/decisions/0009-single-npm-package-release.md)).
+
+Use the Bun version in `.bun-version` and the Node.js version in `.node-version`, ensure `actionlint` is on `PATH` (see the [release runbook](docs/runbooks/release.md) for the exact version), install dev dependencies without lifecycle scripts, and run the repository validation before pushing:
 
 ```console
+bun install --frozen-lockfile --ignore-scripts
 bash scripts/ci/verify.sh
 ```
 
-Changes to release configuration, npm packaging, or release scripts must also pass the publish-free preflight. Use the Node.js version in `.node-version` and the exact npm and GoReleaser versions listed in the [release runbook](docs/runbooks/release.md); CI remains the authoritative pinned environment.
+Changes to release configuration, npm packaging, or release scripts must also pass the publish-free preflight. Use the Bun version in `.bun-version`, the Node.js version in `.node-version`, and the exact npm CLI version listed in the [release runbook](docs/runbooks/release.md); CI remains the authoritative pinned environment.
 
 ```console
 bash scripts/release/preflight.sh
 ```
 
-Both commands are read-only with respect to GitHub and npm. Behaviour changes need tests — HTTP interactions are tested with recorded cassettes (`go-vcr`), so no live GitHub token is required to run the suite.
+Both commands are read-only with respect to GitHub and npm. Behaviour changes need tests — HTTP interactions are tested offline with deterministic replay against recorded HTTP cassettes in `test/fixtures/cassettes/`, so no live GitHub token is required to run the suite.
 
 ## License
 

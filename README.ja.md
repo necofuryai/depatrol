@@ -24,40 +24,29 @@ Renovate 対応は M1 で予定している。
 ## ステータス
 
 現在は pre-alpha である。
-完了済みの M0 feasibility spike CLI は、[最新リリース](https://github.com/necofuryai/depatrol/releases/latest) と npm で公開している。
+M0 相当の CLI は、[最新リリース](https://github.com/necofuryai/depatrol/releases/latest) と npm で公開している。
 read-only の GitHub credential でリポジトリをスキャンし、下記「リポジトリ rollup の語彙」の条件を報告する。
 すべての判定には、`confirmed` または `inferred` の印が付いた証跡の連鎖が伴う ([インストール](#インストール) を参照)。
 
-現時点の対象は GitHub 上の Dependabot である。Renovate (M1)、version update の default branch 再検証 (M2)、統治エンジン — policy、owner、例外、SLA (M3) — は未実装である。各マイルストーンで何が加わるかは [ROADMAP.md](ROADMAP.md) にある。domain model は確定している ([CONTEXT.md](CONTEXT.md) と [docs/decisions/](docs/decisions/) を参照)。実装言語は Go である (ADR 0002)。
+`v0.2.0` 以降、depatrol は TypeScript (Bun) で実装され ([ADR 0008](docs/decisions/0008-typescript-bun-stack.md))、Node.js 22+ と Bun の双方で動作する単一バンドル npm パッケージとして配布される ([ADR 0009](docs/decisions/0009-single-npm-package-release.md))。ロードマップでは、決定論的な read-only 事実・証跡エンジンの一次利用者としてローカルのコーディングエージェントを優先する ([ADR 0010](docs/decisions/0010-agent-first-read-only-interface.md)、[ROADMAP.md](ROADMAP.md))。
+
+現時点の対象は GitHub 上の Dependabot (M0 相当) である。Renovate とエージェント向け CLI / 公式 `SKILL.md` (M1)、`depatrol mcp` によるローカル read-only stdio MCP サーバー (M1.5)、version update の default branch 再検証 (M2)、統治エンジン — policy、owner、例外、SLA (M3) — は未実装である。各マイルストーンで何が加わるかは [ROADMAP.md](ROADMAP.md) にある。domain model は確定している ([CONTEXT.md](CONTEXT.md) と [docs/decisions/](docs/decisions/) を参照)。
 
 ## インストール
 
-すべての配布チャネルは同一の git タグから出荷される (ADR 0006)。実行時には read-only の GitHub token が `GITHUB_TOKEN` (または `GH_TOKEN`) に必要である。
+`v0.2.0` 以降、depatrol は署名付きリリースタグから一度だけビルドされる単一バンドル npm パッケージとして出荷される ([ADR 0009](docs/decisions/0009-single-npm-package-release.md))。実行時には **Node.js 22+ または Bun** と、read-only の GitHub token が `GITHUB_TOKEN` (または `GH_TOKEN`) に必要である。
 
-### npm — ツールチェーン不要
+### npm
 
 ```console
 npx depatrol scan --org your-org
 ```
 
-`bunx depatrol` と `pnpm dlx depatrol` も同じように動く。このパッケージは `optionalDependencies` 経由でプラットフォーム別バイナリを解決し、install スクリプトを一切持たないため、`npm install --ignore-scripts` でも動作する。
-
-`npm ci` が `Cannot find module @depatrol/cli-...` で失敗する場合、古い npm が他プラットフォームの optional 依存を落とした lockfile が原因である ([npm/cli#4828](https://github.com/npm/cli/issues/4828))。`package-lock.json` と `node_modules` を削除し、`npm install` をやり直すこと。
-
-### go install
-
-```console
-go install github.com/necofuryai/depatrol@latest
-```
-
-### バイナリアーカイブ
-
-[GitHub Releases](https://github.com/necofuryai/depatrol/releases) に darwin (arm64 / amd64)、linux (amd64 / arm64)、windows (amd64) のアーカイブと sha256 checksums がある。
+`bunx depatrol` と `pnpm dlx depatrol` も同じように動く。公開パッケージは実行時依存を一切持たず、lifecycle スクリプト (`postinstall` 等) も含まないため、`npm install --ignore-scripts` でもそのまま動作する。
 
 ### リリースの完全性
 
-v0.1.2 以降の GitHub Release は immutable である。
-GitHub Release と npm は、attestation が付与された同一の Actions artifact を配布元として使う ([ADR 0007](docs/decisions/0007-build-once-immutable-release.md))。
+[GitHub Releases](https://github.com/necofuryai/depatrol/releases) は immutable であり、GitHub Releases と npm は attestation が付与された同一の Actions artifact — 単一の `depatrol-<version>.tgz`、`checksums.txt`、`release-manifest.json` — から公開される ([ADR 0009](docs/decisions/0009-single-npm-package-release.md))。
 
 最新 Release の署名済み attestation は、次のコマンドで検証できる。
 
@@ -65,10 +54,10 @@ GitHub Release と npm は、attestation が付与された同一の Actions art
 gh release verify --repo necofuryai/depatrol
 ```
 
-ダウンロードしたアーカイブが Release asset と完全に一致することは、次のコマンドで検証できる。
+ダウンロードした Release tarball が Release asset と完全に一致することは、次のコマンドで検証できる。
 
 ```console
-gh release verify-asset RELEASE-TAG ARCHIVE-PATH --repo necofuryai/depatrol
+gh release verify-asset RELEASE-TAG depatrol-VERSION.tgz --repo necofuryai/depatrol
 ```
 
 ## ドメインモデル

@@ -15,8 +15,11 @@ import { fileURLToPath } from "node:url";
 
 const TAG_PATTERN = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const REPOSITORY = "necofuryai/depatrol";
+const SCHEMA_VERSION = 2;
 const MANIFEST_NAME = "release-manifest.json";
 const NOTES_NAME = "release-notes.md";
+const CHECKSUMS_NAME = "checksums.txt";
+const SRI_PATTERN = /^sha512-[A-Za-z0-9+/]+=*$/;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -24,31 +27,36 @@ function invariant(condition, message) {
   }
 }
 
-function sha256(path) {
+export function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
-function fileRecord(path) {
-  return {
+export function computeSri(path) {
+  return "sha512-" + createHash("sha512").update(readFileSync(path)).digest("base64");
+}
+
+function fileRecord(path, includeSri = false) {
+  const record = {
     name: basename(path),
     size: statSync(path).size,
     digest: "sha256:" + sha256(path),
   };
+  if (includeSri) {
+    record.integrity = computeSri(path);
+  }
+  return record;
 }
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function expectedAssetNames(version) {
-  return [
-    "depatrol_" + version + "_checksums.txt",
-    "depatrol_" + version + "_darwin_amd64.tar.gz",
-    "depatrol_" + version + "_darwin_arm64.tar.gz",
-    "depatrol_" + version + "_linux_amd64.tar.gz",
-    "depatrol_" + version + "_linux_arm64.tar.gz",
-    "depatrol_" + version + "_windows_amd64.zip",
-  ];
+export function tarballName(version) {
+  return "depatrol-" + version + ".tgz";
+}
+
+export function expectedAssetNames(version) {
+  return [CHECKSUMS_NAME, tarballName(version)];
 }
 
 function sortedNames(entries) {
@@ -65,25 +73,23 @@ function assertSameNames(actual, expected, context) {
 }
 
 function verifyChecksums(bundleDir, version) {
-  const checksumName = "depatrol_" + version + "_checksums.txt";
-  const checksumPath = join(bundleDir, checksumName);
-  const archiveNames = expectedAssetNames(version).filter((name) => name !== checksumName);
+  const checksumPath = join(bundleDir, CHECKSUMS_NAME);
+  const tgzName = tarballName(version);
   const lines = readFileSync(checksumPath, "utf8").trim().split(/\r?\n/);
   const recorded = new Map();
 
   for (const line of lines) {
     const match = /^([0-9a-f]{64})  (.+)$/.exec(line);
     invariant(match, "invalid checksum line: " + line);
+    invariant(!recorded.has(match[2]), "duplicate checksum entry: " + match[2]);
     recorded.set(match[2], match[1]);
   }
 
-  assertSameNames(recorded.keys(), archiveNames, "checksum");
-  for (const name of archiveNames) {
-    invariant(
-      recorded.get(name) === sha256(join(bundleDir, name)),
-      "checksum mismatch for " + name,
-    );
-  }
+  assertSameNames(recorded.keys(), [tgzName], "checksum");
+  invariant(
+    recorded.get(tgzName) === sha256(join(bundleDir, tgzName)),
+    "checksum mismatch for " + tgzName,
+  );
 }
 
 export function createBundle(distDir, bundleDir, tag, commit, notesPath) {
@@ -92,29 +98,30 @@ export function createBundle(distDir, bundleDir, tag, commit, notesPath) {
   invariant(!existsSync(bundleDir), "refusing to overwrite existing bundle: " + bundleDir);
 
   const version = tag.slice(1);
-  const metadata = readJson(join(distDir, "metadata.json"));
-  invariant(metadata.project_name === "depatrol", "unexpected GoReleaser project");
-  invariant(metadata.version === version, "GoReleaser version does not match tag");
-  invariant(metadata.commit === commit, "GoReleaser commit does not match tag commit");
+  const tgzName = tarballName(version);
+  const tarballSource = join(distDir, tgzName);
+  invariant(existsSync(tarballSource), "missing npm tarball: " + tarballSource);
+  invariant(existsSync(notesPath), "missing release notes: " + notesPath);
 
   mkdirSync(bundleDir, { recursive: false });
-  const assetNames = expectedAssetNames(version);
-  for (const name of assetNames) {
-    const source = join(distDir, name);
-    invariant(existsSync(source), "missing GoReleaser asset: " + source);
-    copyFileSync(source, join(bundleDir, name));
-  }
-  invariant(existsSync(notesPath), "missing release notes: " + notesPath);
+  const tarballDest = join(bundleDir, tgzName);
+  copyFileSync(tarballSource, tarballDest);
   copyFileSync(notesPath, join(bundleDir, NOTES_NAME));
+
+  const checksumLine = sha256(tarballDest) + "  " + tgzName + "\n";
+  writeFileSync(join(bundleDir, CHECKSUMS_NAME), checksumLine);
 
   verifyChecksums(bundleDir, version);
   const manifest = {
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     repository: REPOSITORY,
     tag,
     commit,
     notes: fileRecord(join(bundleDir, NOTES_NAME)),
-    assets: assetNames.map((name) => fileRecord(join(bundleDir, name))),
+    assets: [
+      fileRecord(join(bundleDir, CHECKSUMS_NAME)),
+      fileRecord(tarballDest, true),
+    ],
   };
   writeFileSync(
     join(bundleDir, MANIFEST_NAME),
@@ -126,7 +133,7 @@ export function createBundle(distDir, bundleDir, tag, commit, notesPath) {
 
 export function verifyBundle(bundleDir, expectedTag, expectedCommit) {
   const manifest = readJson(join(bundleDir, MANIFEST_NAME));
-  invariant(manifest.schemaVersion === 1, "unsupported manifest schema");
+  invariant(manifest.schemaVersion === SCHEMA_VERSION, "unsupported manifest schema");
   invariant(manifest.repository === REPOSITORY, "unexpected manifest repository");
   invariant(TAG_PATTERN.test(manifest.tag), "invalid manifest tag");
   invariant(/^[0-9a-f]{40}$/.test(manifest.commit), "invalid manifest commit");
@@ -141,6 +148,7 @@ export function verifyBundle(bundleDir, expectedTag, expectedCommit) {
   }
 
   const version = manifest.tag.slice(1);
+  const tgzName = tarballName(version);
   assertSameNames(
     manifest.assets.map((asset) => asset.name),
     expectedAssetNames(version),
@@ -153,15 +161,30 @@ export function verifyBundle(bundleDir, expectedTag, expectedCommit) {
     NOTES_NAME,
     ...manifest.assets.map((asset) => asset.name),
   ];
-  const actualFiles = readdirSync(bundleDir).filter((name) =>
-    statSync(join(bundleDir, name)).isFile(),
-  );
-  assertSameNames(actualFiles, expectedFiles, "bundle file");
+  const entries = readdirSync(bundleDir);
+  for (const name of entries) {
+    invariant(
+      statSync(join(bundleDir, name)).isFile(),
+      "unexpected non-file entry in bundle: " + name,
+    );
+  }
+  assertSameNames(entries, expectedFiles, "bundle file");
 
   for (const record of [manifest.notes, ...manifest.assets]) {
-    const actual = fileRecord(join(bundleDir, record.name));
+    const filePath = join(bundleDir, record.name);
+    const actual = fileRecord(filePath, record.name === tgzName);
     invariant(actual.size === record.size, "size mismatch for " + record.name);
     invariant(actual.digest === record.digest, "digest mismatch for " + record.name);
+    if (record.name === tgzName) {
+      invariant(
+        typeof record.integrity === "string" && SRI_PATTERN.test(record.integrity),
+        "missing or invalid SRI integrity for " + record.name,
+      );
+      invariant(
+        actual.integrity === record.integrity,
+        "integrity mismatch for " + record.name,
+      );
+    }
   }
   verifyChecksums(bundleDir, version);
   return manifest;
