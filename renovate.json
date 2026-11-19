@@ -22,7 +22,9 @@
   "pruneStaleBranches": true,
   "automerge": false,
   "platformAutomerge": false,
-  "dependencyDashboard": true,
+  "dependencyDashboard": {
+    "enabled": true
+  },
   "vulnerabilityAlerts": {
     "enabled": true,
     "automerge": false,
