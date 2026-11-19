@@ -22,37 +22,27 @@ Existing tools tell you a bot is *configured* (OpenSSF Scorecard, Evergreen) or 
 
 ## Status
 
-Pre-alpha. The completed M0 feasibility-spike CLI is available in the [latest release](https://github.com/necofuryai/depatrol/releases/latest) and through npm. It scans repositories with read-only GitHub credentials and reports the conditions below, with every judgment carrying an evidence chain marked `confirmed` or `inferred`; see [Installation](#installation).
+Pre-alpha. The M0-equivalent CLI is available in the [latest release](https://github.com/necofuryai/depatrol/releases/latest) and through npm. It scans repositories with read-only GitHub credentials and reports the conditions below, with every judgment carrying an evidence chain marked `confirmed` or `inferred`; see [Installation](#installation).
 
-Scope today is Dependabot on GitHub. Renovate (M1), default-branch re-verification of version updates (M2), and the governance engine — policy, owners, exceptions, SLA (M3) — are not implemented yet; [ROADMAP.md](ROADMAP.md) says what each milestone adds. The domain model is settled (see [CONTEXT.md](CONTEXT.md) and [docs/decisions/](docs/decisions/)); the implementation language is Go (ADR 0002).
+Starting with `v0.2.0`, depatrol is implemented in TypeScript (Bun) ([ADR 0008](docs/decisions/0008-typescript-bun-stack.md)) and distributed as a single bundled npm package compatible with Node.js 22+ and Bun ([ADR 0009](docs/decisions/0009-single-npm-package-release.md)). Its roadmap prioritizes local coding agents as the primary consumer of its deterministic, read-only fact and evidence engine ([ADR 0010](docs/decisions/0010-agent-first-read-only-interface.md), [ROADMAP.md](ROADMAP.md)).
+
+Scope today is Dependabot on GitHub (M0 equivalent). Renovate together with an agent-friendly CLI and official `SKILL.md` (M1), a local read-only stdio MCP server via `depatrol mcp` (M1.5), default-branch re-verification of version updates (M2), and the governance engine — policy, owners, exceptions, SLA (M3) — are not implemented yet; [ROADMAP.md](ROADMAP.md) says what each milestone adds. The domain model is settled (see [CONTEXT.md](CONTEXT.md) and [docs/decisions/](docs/decisions/)).
 
 ## Installation
 
-Every distribution channel ships from the same git tag (ADR 0006). At run time the CLI needs a read-only GitHub token in `GITHUB_TOKEN` (or `GH_TOKEN`).
+Starting with `v0.2.0`, depatrol ships as a single bundled npm package built once from a signed release tag ([ADR 0009](docs/decisions/0009-single-npm-package-release.md)). At run time the CLI requires **Node.js 22+ or Bun** and a read-only GitHub token in `GITHUB_TOKEN` (or `GH_TOKEN`).
 
-### npm — no toolchain required
+### npm
 
 ```console
 npx depatrol scan --org your-org
 ```
 
-`bunx depatrol` and `pnpm dlx depatrol` work the same way. The package resolves a platform-specific binary through `optionalDependencies` and has no install scripts, so `npm install --ignore-scripts` also works.
-
-If `npm ci` fails with `Cannot find module @depatrol/cli-...`, the lockfile was written by an older npm that dropped other platforms' optional dependencies ([npm/cli#4828](https://github.com/npm/cli/issues/4828)). Delete `package-lock.json` and `node_modules`, then run `npm install` again.
-
-### go install
-
-```console
-go install github.com/necofuryai/depatrol@latest
-```
-
-### Binary archives
-
-[GitHub Releases](https://github.com/necofuryai/depatrol/releases) carries archives for darwin (arm64 / amd64), linux (amd64 / arm64), and windows (amd64), each release with sha256 checksums.
+`bunx depatrol` and `pnpm dlx depatrol` work the same way. The published package has zero runtime dependencies and no lifecycle scripts (`postinstall`, etc.), so `npm install --ignore-scripts` works out of the box.
 
 ### Release integrity
 
-Starting with v0.1.2, GitHub Releases are immutable. GitHub Releases and npm publish from the same attested Actions artifact ([ADR 0007](docs/decisions/0007-build-once-immutable-release.md)).
+[GitHub Releases](https://github.com/necofuryai/depatrol/releases) are immutable, and GitHub Releases and npm publish from the same attested Actions artifact — the single `depatrol-<version>.tgz` tarball, `checksums.txt`, and `release-manifest.json` ([ADR 0009](docs/decisions/0009-single-npm-package-release.md)).
 
 Verify the signed attestation for the latest release:
 
@@ -60,10 +50,10 @@ Verify the signed attestation for the latest release:
 gh release verify --repo necofuryai/depatrol
 ```
 
-To verify that a downloaded archive exactly matches a release asset:
+To verify that a downloaded release tarball exactly matches a release asset:
 
 ```console
-gh release verify-asset RELEASE-TAG ARCHIVE-PATH --repo necofuryai/depatrol
+gh release verify-asset RELEASE-TAG depatrol-VERSION.tgz --repo necofuryai/depatrol
 ```
 
 ## Domain model

@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Please check [ROADMAP.md](https://github.com/necofuryai/depatrol/blob/main/ROADMAP.md) first — Renovate support (M1), default-branch re-verification (M2), and the governance engine (M3) are already planned.
+        Please check [ROADMAP.md](https://github.com/necofuryai/depatrol/blob/main/ROADMAP.md) first — Renovate support and agent-friendly CLI / `SKILL.md` (M1), local read-only MCP (`depatrol mcp`, M1.5), default-branch re-verification (M2), and the governance engine (M3) are already planned.
   - type: textarea
     id: problem
     attributes:

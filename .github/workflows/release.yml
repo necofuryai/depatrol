@@ -1,5 +1,6 @@
 # A signed stable tag is the only release trigger. The build job creates one
-# attested bundle; GitHub Release and npm consume that exact bundle.
+# attested single-package bundle; GitHub Release and npm consume that exact
+# bundle without re-packing (ADR 0009).
 name: release
 
 on:
@@ -36,20 +37,37 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          go-version-file: go.mod
+          bun-version-file: .bun-version
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
       # renovate: datasource=npm depName=npm versioning=npm
       - run: npm install -g npm@11.19.0
-      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
-        with:
-          distribution: goreleaser
-          # renovate: datasource=github-releases depName=goreleaser/goreleaser versioning=semver-coerced
-          version: v2.18.0
-          install-only: true
+      - name: Install verified actionlint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # renovate: datasource=github-releases depName=rhysd/actionlint versioning=semver-coerced
+          ACTIONLINT_VERSION: v1.7.12
+        run: |
+          version=${ACTIONLINT_VERSION#v}
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          tmp_dir=$(mktemp -d)
+          gh release download "$ACTIONLINT_VERSION" \
+            --repo rhysd/actionlint \
+            --pattern "$archive" \
+            --dir "$tmp_dir"
+          gh attestation verify "$tmp_dir/$archive" \
+            --repo rhysd/actionlint \
+            --source-ref "refs/tags/$ACTIONLINT_VERSION" \
+            --deny-self-hosted-runners
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$tmp_dir/$archive" -C "$RUNNER_TEMP/actionlint" actionlint
+          rm -rf "$tmp_dir"
+          printf '%s\n' "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun audit --audit-level=moderate
       - run: bash scripts/ci/verify.sh
       - run: bash scripts/release/preflight.sh
 
@@ -65,26 +83,27 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          go-version-file: go.mod
+          bun-version-file: .bun-version
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
-      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
-        with:
-          distribution: goreleaser
-          # renovate: datasource=github-releases depName=goreleaser/goreleaser versioning=semver-coerced
-          version: v2.18.0
-          install-only: true
-      - name: Build release assets once
-        run: goreleaser release --clean --skip=publish
+      # renovate: datasource=npm depName=npm versioning=npm
+      - run: npm install -g npm@11.19.0
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build single npm tarball once
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          commit_date=$(git show -s --format=%cI "$GITHUB_SHA")
+          node scripts/release/build-package.mjs \
+            "$version" "$GITHUB_SHA" "$commit_date" dist-release
       - name: Generate release notes
         run: bash scripts/release/notes.sh "$GITHUB_REF_NAME" > release-notes.md
       - name: Create verified release bundle
         run: >-
           node scripts/release/artifacts.mjs create
-          dist release-bundle "$GITHUB_REF_NAME" "$GITHUB_SHA" release-notes.md
+          dist-release release-bundle "$GITHUB_REF_NAME" "$GITHUB_SHA" release-notes.md
       - name: Attest release bundle
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -152,9 +171,5 @@ jobs:
           bash scripts/release/verify-attestations.sh release-bundle
       # renovate: datasource=npm depName=npm versioning=npm
       - run: npm install -g npm@11.19.0
-      - name: Repackage release archives
-        run: |
-          version=$(printf '%s' "$GITHUB_REF_NAME" | cut -c2-)
-          node packaging/npm/prepare.mjs "$version" release-bundle
-      - name: Publish exact tarballs
-        run: node packaging/npm/publish.mjs packaging/npm/dist
+      - name: Publish exact attested tarball
+        run: node scripts/release/publish-npm.mjs release-bundle

@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-go mod verify
-go mod tidy -diff
-go -C tools mod verify
-go -C tools mod tidy -diff
-go build ./...
-go vet ./...
+node scripts/release/build-package.mjs --check-manifest
+bun run typecheck
+bun test
+bun run build
+chmod +x dist/depatrol.js
+node scripts/release/build-package.mjs --check-bundle dist/depatrol.js
 
-unformatted=$(gofmt -l .)
-if [ -n "$unformatted" ]; then
-  echo "gofmt is required for:"
-  echo "$unformatted"
+node_version=$(node dist/depatrol.js --version)
+bun_version=$(bun dist/depatrol.js --version)
+if [ -z "$node_version" ] || [ "$node_version" != "$bun_version" ]; then
+  echo "verify: node and bun --version output differed (node='$node_version', bun='$bun_version')" >&2
   exit 1
 fi
 
-go test -race ./...
+node --test scripts/release/*.test.mjs
 
-tool_bin_dir=$(mktemp -d)
-trap 'rm -rf "$tool_bin_dir"' EXIT
-go -C tools build -o "$tool_bin_dir/govulncheck" golang.org/x/vuln/cmd/govulncheck
-go -C tools build -o "$tool_bin_dir/actionlint" github.com/rhysd/actionlint/cmd/actionlint
-"$tool_bin_dir/govulncheck" ./...
-"$tool_bin_dir/actionlint"
-node --test scripts/release/*.test.mjs packaging/npm/*.test.mjs
+if ! command -v actionlint >/dev/null 2>&1; then
+  echo "verify: actionlint is required on PATH" >&2
+  exit 1
+fi
+actionlint
