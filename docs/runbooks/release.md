@@ -81,8 +81,8 @@ Workflow を有効化する前に、repository と npm に次を設定する。
    Renovate App と GitHub Actions には bypass を与えない。
 4. `release-tag-immutability` ruleset で `v*` tag の update と deletion を制限し、通常運用の bypass actor を設定しない。
    Creation 用 bypass をこの ruleset に流用してはならない。
-5. Actions policy allowlist は GitHub-owned actions と **`oven-sh/setup-bun`** だけを許可し、full SHA pinning を必須にする。
-   `v0.1.x` で許可していた `goreleaser/goreleaser-action` は `v0.2.0` 移行に合わせて allowlist から外し、`oven-sh/setup-bun` へ切り替える。
+5. Actions policy allowlist は GitHub-owned actions と **`oven-sh/setup-bun@*`** だけを許可し、full SHA pinning を必須にする。
+   `v0.1.x` で許可していた `goreleaser/goreleaser-action@*` は `v0.2.0` 移行に合わせて allowlist から外し、`oven-sh/setup-bun@*` へ切り替える（`@*` が無いと SHA 固定参照に一致しない）。
 6. Repository-level immutable releases を有効化する。
    この設定は新しい release にだけ適用され、既存 release は immutable にならない。
 7. Administration read token で immutable releases endpoint の `enabled: true` を確認してから、repository variable `IMMUTABLE_RELEASES_ENABLED=true` を設定する。
